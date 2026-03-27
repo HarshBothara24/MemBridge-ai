@@ -6,8 +6,10 @@ temporal reasoning, and bilingual (EN/HI) support.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
+import json
 import logging
 
 from db import init_db
@@ -18,7 +20,7 @@ from memory_engine import (
 )
 from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
-from llm_service import extract_facts_llm, generate_response
+from llm_service import extract_facts_llm, generate_response, generate_response_stream
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -157,6 +159,78 @@ def _merge_facts(regex_facts: list, llm_facts: list) -> list:
             merged[key] = f
 
     return list(merged.values())
+
+
+# ──────────────────────────────────────────────
+# Streaming Chat Endpoint
+# ──────────────────────────────────────────────
+@app.post("/chat/stream")
+def chat_stream(req: ChatRequest):
+    """
+    Same as /chat but streams the LLM response token-by-token.
+    Returns an NDJSON stream where each line is a JSON object.
+    """
+    # 1. Detect language
+    lang = detect_language(req.message)
+
+    # 2. Fast regex fact extraction
+    regex_facts = extract_facts(req.message)
+
+    # 3. LLM fact extraction
+    llm_facts = extract_facts_llm(req.message)
+
+    # 4. Merge facts
+    merged_facts = _merge_facts(regex_facts, llm_facts)
+
+    # 5. Upsert facts into PostgreSQL
+    if merged_facts:
+        upsert_facts(req.customer_id, merged_facts)
+
+    # Save user message
+    save_chat_message(req.customer_id, "user", req.message, merged_facts)
+
+    # 6. Classify intent and fetch relevant memory
+    intent, memory_keys = classify_intent(req.message)
+
+    if memory_keys:
+        relevant_facts = get_facts_by_keys(req.customer_id, memory_keys)
+    else:
+        relevant_facts = get_active_facts(req.customer_id)
+
+    # 7. Build context
+    memory_context = build_memory_context(relevant_facts, lang)
+    history = get_recent_history(req.customer_id, limit=6)
+    prompt = build_full_prompt(req.message, memory_context, history, lang)
+
+    # 8. Generate suggestions (sent as first chunk before streaming starts)
+    all_facts = get_active_facts(req.customer_id)
+    suggestions = build_recall_suggestions(all_facts, intent, lang)
+
+    def event_stream():
+        # Send metadata as the first line
+        meta = {
+            "type": "meta",
+            "extracted_facts": [{"key": f["key"], "value": f["value"]} for f in merged_facts],
+            "intent": intent,
+            "suggestions": suggestions,
+            "language": lang,
+        }
+        yield json.dumps(meta) + "\n"
+
+        # Stream LLM tokens
+        full_response = ""
+        for chunk in generate_response_stream(prompt):
+            data = json.loads(chunk)
+            if data.get("done"):
+                full_response = data.get("full_response", "")
+            yield json.dumps({"type": "token", **data}) + "\n"
+
+        # Save assistant response after streaming completes
+        if full_response:
+            save_chat_message(req.customer_id, "assistant", full_response)
+
+
+    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
 # ──────────────────────────────────────────────

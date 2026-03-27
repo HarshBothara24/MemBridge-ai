@@ -343,6 +343,21 @@
   max-width: 400px;
 }
 
+/* ── Streaming cursor ──────────────────────────────── */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  margin-left: 2px;
+  color: var(--accent, #3B82F6);
+  animation: blink-cursor 0.7s step-end infinite;
+  font-weight: 400;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 767px) {
   .chat-messages { padding: 20px 16px 160px; gap: 16px; }

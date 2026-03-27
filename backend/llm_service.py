@@ -16,7 +16,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "llama3.2:3b"
+MODEL_NAME = "llama3.1:8b"
 TIMEOUT_SECONDS = 30  # generous timeout for local models
 
 
@@ -138,3 +138,47 @@ def generate_response(prompt: str) -> str:
     except Exception as e:
         logger.error("LLM response generation failed: %s", e)
         return "Something went wrong. Please try again."
+
+
+def generate_response_stream(prompt: str):
+    """
+    Stream LLM response token-by-token using Ollama's streaming API.
+    Yields JSON lines: {"token": "...", "done": false} for each chunk,
+    and {"token": "", "done": true, "full_response": "..."} at the end.
+    """
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": prompt,
+        "stream": True,
+        "options": {
+            "temperature": 0.7,
+            "num_predict": 512,
+        },
+    }
+
+    full_response = ""
+
+    try:
+        with requests.post(OLLAMA_URL, json=payload, timeout=120, stream=True) as res:
+            res.raise_for_status()
+            for line in res.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
+                    token = chunk.get("response", "")
+                    done = chunk.get("done", False)
+                    full_response += token
+
+                    if done:
+                        yield json.dumps({"token": "", "done": True, "full_response": full_response.strip()}) + "\n"
+                    else:
+                        yield json.dumps({"token": token, "done": False}) + "\n"
+                except json.JSONDecodeError:
+                    continue
+
+    except requests.exceptions.Timeout:
+        yield json.dumps({"token": "", "done": True, "full_response": "I'm taking longer than expected. Please try again."}) + "\n"
+    except Exception as e:
+        logger.error("LLM streaming failed: %s", e)
+        yield json.dumps({"token": "", "done": True, "full_response": "Something went wrong. Please try again."}) + "\n"

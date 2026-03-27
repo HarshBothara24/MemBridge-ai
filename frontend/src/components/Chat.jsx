@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { sendMessage } from '../services/api'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { sendMessageStream } from '../services/api'
 import './Chat.css'
 
 const FACT_LABELS = {
@@ -32,6 +32,7 @@ export default function Chat({ customerId, onMemoryUpdate }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -46,37 +47,92 @@ export default function Chat({ customerId, onMemoryUpdate }) {
     setSuggestions([])
   }, [customerId])
 
-  async function handleSend(text) {
+  const handleSend = useCallback(async (text) => {
     const msg = (text || input).trim()
-    if (!msg || loading) return
+    if (!msg || loading || streaming) return
 
+    // Add user message
     setMessages((prev) => [...prev, { role: 'user', text: msg, facts: [] }])
     setInput('')
     setLoading(true)
 
     try {
-      const data = await sendMessage(msg, customerId)
+      // Add an empty AI message that we'll stream into
       setMessages((prev) => [
-        // Update last user message with extracted facts
-        ...prev.slice(0, -1),
-        { ...prev[prev.length - 1], facts: data.extracted_facts || [] },
-        { role: 'ai', text: data.response, facts: [] },
+        ...prev,
+        { role: 'ai', text: '', facts: [], isStreaming: true },
       ])
-      setSuggestions(data.suggestions || [])
+      setStreaming(true)
+      setLoading(false) // hide typing dots, show streaming text instead
+
+      const fullResponse = await sendMessageStream(
+        msg,
+        customerId,
+        // onMeta: receive extracted facts, intent, suggestions, language
+        (meta) => {
+          // Update the user message with extracted facts
+          setMessages((prev) => {
+            const updated = [...prev]
+            // Find the last user message (second to last in array)
+            const userMsgIdx = updated.length - 2
+            if (userMsgIdx >= 0 && updated[userMsgIdx].role === 'user') {
+              updated[userMsgIdx] = {
+                ...updated[userMsgIdx],
+                facts: meta.extracted_facts || [],
+              }
+            }
+            return updated
+          })
+          setSuggestions(meta.suggestions || [])
+        },
+        // onToken: append each token to the AI message
+        (token) => {
+          setMessages((prev) => {
+            const updated = [...prev]
+            const lastMsg = updated[updated.length - 1]
+            if (lastMsg && lastMsg.role === 'ai') {
+              updated[updated.length - 1] = {
+                ...lastMsg,
+                text: lastMsg.text + token,
+              }
+            }
+            return updated
+          })
+        }
+      )
+
+      // Mark streaming as complete
+      setMessages((prev) => {
+        const updated = [...prev]
+        const lastMsg = updated[updated.length - 1]
+        if (lastMsg && lastMsg.role === 'ai') {
+          updated[updated.length - 1] = {
+            ...lastMsg,
+            text: fullResponse || lastMsg.text,
+            isStreaming: false,
+          }
+        }
+        return updated
+      })
 
       // Notify parent to refresh memory panels
       if (onMemoryUpdate) onMemoryUpdate()
     } catch (err) {
       console.error('Chat error:', err)
-      setMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: 'Something went wrong. Please try again.', facts: [] },
-      ])
+      setMessages((prev) => {
+        // Remove the empty streaming message if it exists
+        const updated = prev.filter((m) => !(m.role === 'ai' && m.isStreaming && !m.text))
+        return [
+          ...updated,
+          { role: 'ai', text: 'Something went wrong. Please try again.', facts: [] },
+        ]
+      })
     } finally {
+      setStreaming(false)
       setLoading(false)
       inputRef.current?.focus()
     }
-  }
+  }, [input, loading, streaming, customerId, onMemoryUpdate])
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -120,7 +176,10 @@ export default function Chat({ customerId, onMemoryUpdate }) {
               )}
 
               <div className="msg-content">
-                <div className={`msg-bubble ${msg.role}`}>{msg.text}</div>
+                <div className={`msg-bubble ${msg.role}`}>
+                  {msg.text}
+                  {msg.isStreaming && <span className="streaming-cursor">▊</span>}
+                </div>
                 <span className="msg-time">
                   {msg.role === 'user' ? 'SENT' : formatTime()}
                 </span>
@@ -141,8 +200,8 @@ export default function Chat({ customerId, onMemoryUpdate }) {
           </div>
         ))}
 
-        {/* Typing indicator */}
-        {loading && (
+        {/* Typing indicator — only when waiting for first token */}
+        {loading && !streaming && (
           <div className="msg-row msg-ai">
             <div className="msg-avatar msg-avatar-dim">
               <span className="material-symbols-outlined">smart_toy</span>
@@ -159,7 +218,7 @@ export default function Chat({ customerId, onMemoryUpdate }) {
       </div>
 
       {/* ── Suggestions ──────────────────────────────── */}
-      {suggestions.length > 0 && !loading && (
+      {suggestions.length > 0 && !loading && !streaming && (
         <div className="suggestions-area">
           {suggestions.map((s, i) => (
             <div
@@ -189,12 +248,12 @@ export default function Chat({ customerId, onMemoryUpdate }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={loading}
+              disabled={loading || streaming}
             />
             <button
               id="send-button"
               onClick={() => handleSend()}
-              disabled={loading || !input.trim()}
+              disabled={loading || streaming || !input.trim()}
               aria-label="Send message"
             >
               <span className="material-symbols-outlined">arrow_upward</span>
