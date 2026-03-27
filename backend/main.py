@@ -30,6 +30,9 @@ from loan_calculator import get_calculation_context
 from services.stt_service import transcribe
 from services.tts_service import generate_audio
 from services.language_service import detect_language as detect_lang_voice
+from services.memory_connections import attach_relationships
+from services.dependency_engine import track_dependencies
+from services.consistency import detect_conflicts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,6 +82,10 @@ class ChatResponse(BaseModel):
     suggestions: list
     language: str
     session_id: str
+    used_memory: list = []
+    reason: str = ""
+    warnings: list = []
+    clarification: Optional[str] = None
 
 
 # ──────────────────────────────────────────────
@@ -117,9 +124,34 @@ def chat(req: ChatRequest):
     merged_facts = _merge_facts(regex_facts, llm_facts)
     logger.info("Merged into %d unique facts", len(merged_facts))
 
-    # 5. Upsert facts into PostgreSQL
+    # 4.5 Confidence Handling, Connection Mapping & Consistency
+    clarification = None
+    final_facts = []
+    for f in merged_facts:
+        if f.get("confidence", 0.8) < 0.7:
+            # Soft clarification trigger
+            key_name = f.get("key", "detail").replace("_", " ")
+            val = f.get("value", "")
+            clarification = f"Should I store your {key_name} as {val}?"
+        else:
+            final_facts.append(attach_relationships(f))
+
+    merged_facts = final_facts
+
+    # 5. Upsert facts into PostgreSQL & Track Dependencies
     if merged_facts:
         upsert_facts(req.customer_id, merged_facts)
+        
+    updated_keys = [f["key"] for f in merged_facts]
+    dependency_notes = track_dependencies(updated_keys)
+
+    # Detect logical conflicts
+    all_facts = get_active_facts(req.customer_id)
+    profile_dict = {f["key"]: f["value"] for f in all_facts}
+    warnings = detect_conflicts(merged_facts, profile_dict)
+    
+    # Append dependency tracker notes to warnings for observability
+    warnings.extend(dependency_notes)
 
     # Save user message to chat history
     save_chat_message(req.customer_id, session_id, "user", req.message, merged_facts)
@@ -153,9 +185,16 @@ def chat(req: ChatRequest):
     # 9. Save assistant response
     save_chat_message(req.customer_id, session_id, "assistant", response)
 
-    # 10. Generate recall suggestions
-    all_facts = get_active_facts(req.customer_id)
+    # 10. Generate recall suggestions and Memory Influence
     suggestions = build_recall_suggestions(all_facts, intent, lang)
+    
+    used_memory = [f["key"] for f in relevant_facts]
+    affects_set = set()
+    for f in relevant_facts:
+        if isinstance(f.get("affects"), list):
+            affects_set.update(f.get("affects"))
+            
+    reason_str = "These affect " + ", ".join(affects_set) if affects_set else "These are relevant to your query."
 
     return ChatResponse(
         response=response,
@@ -164,6 +203,10 @@ def chat(req: ChatRequest):
         suggestions=suggestions,
         language=lang,
         session_id=session_id,
+        used_memory=used_memory,
+        reason=reason_str,
+        warnings=warnings,
+        clarification=clarification,
     )
 
 
@@ -213,9 +256,30 @@ def chat_stream(req: ChatRequest):
     # 4. Merge facts
     merged_facts = _merge_facts(regex_facts, llm_facts)
 
+    # 4.5 Confidence Handling, Connection Mapping & Consistency
+    clarification = None
+    final_facts = []
+    for f in merged_facts:
+        if f.get("confidence", 0.8) < 0.7:
+            key_name = f.get("key", "detail").replace("_", " ")
+            val = f.get("value", "")
+            clarification = f"Should I store your {key_name} as {val}?"
+        else:
+            final_facts.append(attach_relationships(f))
+
+    merged_facts = final_facts
+
     # 5. Upsert facts into PostgreSQL
     if merged_facts:
         upsert_facts(req.customer_id, merged_facts)
+        
+    updated_keys = [f["key"] for f in merged_facts]
+    dependency_notes = track_dependencies(updated_keys)
+
+    all_facts = get_active_facts(req.customer_id)
+    profile_dict = {f["key"]: f["value"] for f in all_facts}
+    warnings = detect_conflicts(merged_facts, profile_dict)
+    warnings.extend(dependency_notes)
 
     # Save user message
     save_chat_message(req.customer_id, session_id, "user", req.message, merged_facts)
@@ -236,9 +300,15 @@ def chat_stream(req: ChatRequest):
     if calc_context:
         prompt = calc_context + "\n\n" + prompt
 
-    # 8. Generate suggestions (sent as first chunk before streaming starts)
-    all_facts = get_active_facts(req.customer_id)
+    # 8. Generate suggestions and memory influence info
     suggestions = build_recall_suggestions(all_facts, intent, lang)
+    
+    used_memory = [f["key"] for f in relevant_facts]
+    affects_set = set()
+    for f in relevant_facts:
+        if isinstance(f.get("affects"), list):
+            affects_set.update(f.get("affects"))
+    reason_str = "These affect " + ", ".join(affects_set) if affects_set else "These are relevant to your query."
 
     def event_stream():
         # Send metadata as the first line
@@ -249,6 +319,10 @@ def chat_stream(req: ChatRequest):
             "suggestions": suggestions,
             "language": lang,
             "session_id": session_id,
+            "used_memory": used_memory,
+            "reason": reason_str,
+            "warnings": warnings,
+            "clarification": clarification,
         }
         yield json.dumps(meta) + "\n"
 

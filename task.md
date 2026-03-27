@@ -1,8 +1,13 @@
-# Feature 2 Execution: Importance Scoring & Ranker
+# Execution Plan: Advanced Memory Intelligence
 
-- [x] Add `access_count` and `last_accessed_at` columns to the `memory_facts` schema in `db.py`.
-- [x] Implement `calculate_importance(fact)` algorithm in `memory_engine.py`.
-- [x] Update `get_active_facts` and `get_facts_by_keys` to dynamically update read contexts (incrementing access count and recalculating importance).
-- [x] Add `get_relevant_facts` in `memory_engine.py` to fetch explicitly the Top-K facts by importance score.
-- [x] Replace naive fetching in `main.py` to utilize `get_relevant_facts(..., limit=8)` for context injection.
-- [x] **Bonus**: Update the LLM System prompts in `context_builder.py` to explicitly default to English, only use Hindi if spoken to, act naturally, and optionally explain reasoning when citing memory facts.
+- [x] **Database Upgrades**: Update `backend/db.py` with `affects`, `used_for`, and `relations` JSONB arrays.
+- [x] **Create `services/memory_connections.py`**: Rule-based mapping layer running pre-upsert mapping `affects` arrays.
+- [x] **Create `services/dependency_engine.py`**: Tracking engine tagging cascaded dependencies on memory updates.
+- [x] **Create `services/consistency.py`**: Logical conflict detector returning warning arrays.
+- [x] **Update `backend/temporal.py`**: Add lightweight labels generator (`"today"`, `"recently"`, `"earlier"`).
+- [x] **Upgrade `backend/context_builder.py`**: Integrate temporal labels, cap strict limit at 5, order by importance score.
+- [x] **Upgrade `backend/memory_engine.py`**: Modify the `calculate_importance()` math formula.
+- [x] **Upgrade `backend/main.py`**:
+  - Implement soft clarification for conf < 0.7 without crashing response explicitly.
+  - Return dynamic memory payload (`used_memory`, `reason`, `warnings`, `suggestions`).
+  - Route extracted facts through the `memory_connections` layer BEFORE inserting to DB.

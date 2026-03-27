@@ -9,7 +9,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from temporal import humanize_timestamp, format_fact_temporal, _format_currency
+from temporal import humanize_timestamp, format_fact_temporal, _format_currency, compute_recency_label
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,11 @@ def build_memory_context(
             return "Abhi tak koi jaankari nahi hai."
         return "No information available about this customer yet."
 
+    # Rank by importance and limit to 5
+    ranked_facts = sorted(facts, key=lambda f: f.get("importance_score", 0.0), reverse=True)[:5]
+
     sentences = []
-    for fact in facts:
+    for fact in ranked_facts:
         key = fact.get("key", "")
         value = str(fact.get("value", "")).strip('"')
         timestamp = fact.get("updated_at") or fact.get("created_at")
@@ -113,11 +116,17 @@ def _suggestions_en(
 ) -> List[str]:
     suggestions = []
 
+    # Proactive Suggestion Rule: Co-applicant present
+    if "co_applicant" in fact_keys:
+        co_fact = next((f for f in facts if f["key"] == "co_applicant"), None)
+        if co_fact and str(co_fact.get("value", "")).lower() not in ["no", "none", "false"]:
+            suggestions.append("Since you have a co-applicant, you might qualify for improved loan eligibility. Shall we check?")
+            
     # Co-applicant exists but no co-applicant income
     if "co_applicant" in fact_keys and "co_applicant_income" not in fact_keys:
         co_fact = next((f for f in facts if f["key"] == "co_applicant"), None)
-        if co_fact:
-            time_str = humanize_timestamp(co_fact.get("updated_at", ""), "en")
+        if co_fact and str(co_fact.get("value", "")).lower() not in ["no", "none", "false"]:
+            time_str = compute_recency_label(co_fact.get("updated_at", ""), "en")
             suggestions.append(
                 f"You mentioned a co-applicant {time_str} — would you like to include their income?"
             )

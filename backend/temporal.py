@@ -115,12 +115,9 @@ def format_fact_temporal(
     lang: str = "en",
 ) -> str:
     """
-    Create a natural language sentence for a fact with temporal context.
-
-    Example (en): "You mentioned an income of ₹40,000 yesterday"
-    Example (hi): "Aapne kal ₹40,000 income bataya tha"
+    Create a natural language sentence for a fact with temporal context using recency labels.
     """
-    time_str = humanize_timestamp(timestamp, lang)
+    time_str = compute_recency_label(timestamp, lang)
 
     if lang == "hi":
         return _format_fact_hi(key, value, time_str)
@@ -185,3 +182,34 @@ def _format_currency(value: str | int | float) -> str:
         result = s[-2:] + "," + result
         s = s[:-2]
     return f"₹{result}"
+
+def compute_recency_label(timestamp: datetime | str, lang: str = "en") -> str:
+    """
+    Computes a simplified recency label.
+    Categories: 'today', 'recently', 'earlier'
+    """
+    if isinstance(timestamp, str):
+        try:
+            timestamp = datetime.fromisoformat(timestamp)
+        except ValueError:
+            return "earlier"
+
+    now = _now_ist()
+    # Normalize naive
+    if timestamp.tzinfo is not None:
+        timestamp = timestamp.astimezone(IST).replace(tzinfo=None)
+
+    delta = now - timestamp
+    days = delta.days
+
+    if lang == "hi":
+        if days == 0: return "aaj"
+        if days <= 14: return "haal hi mein"
+        return "pehle"
+
+    if days == 0:
+        return "today"
+    elif days <= 14:
+        return "recently"
+    else:
+        return "earlier"

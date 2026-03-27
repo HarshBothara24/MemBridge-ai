@@ -97,6 +97,9 @@ CREATE TABLE IF NOT EXISTS memory_facts (
     version         INTEGER DEFAULT 1,
     status          TEXT DEFAULT 'active' CHECK (status IN ('active', 'superseded')),
     source          TEXT DEFAULT 'user' CHECK (source IN ('user', 'inferred', 'llm')),
+    affects         JSONB DEFAULT '[]',
+    used_for        JSONB DEFAULT '[]',
+    relations       JSONB DEFAULT '[]',
     access_count    INTEGER DEFAULT 0,
     last_accessed_at TIMESTAMP DEFAULT NOW(),
     created_at      TIMESTAMP DEFAULT NOW(),
@@ -132,6 +135,9 @@ def init_db():
         cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS importance_score REAL DEFAULT 0.0;")
         cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0;")
         cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMP DEFAULT NOW();")
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS affects JSONB DEFAULT '[]';")
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS used_for JSONB DEFAULT '[]';")
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS relations JSONB DEFAULT '[]';")
         cur.execute("ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS session_id TEXT;")
     logger.info("Database schema initialized.")
 

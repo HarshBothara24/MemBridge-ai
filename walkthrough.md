@@ -1,27 +1,24 @@
-# Importance Scoring, Relevance Filter & Prompt Overhaul Complete
+# Memory Intelligence Upgrade Complete 🧠
 
-We've successfully rolled out Feature 2 and executed a complete overhaul of the conversational prompts to align directly with the architectural requirements.
+The MemBridge AI architecture has just undergone a massive capability jump. It no longer just stores data—it actively tracks relationships, detects logical flaws, ranks relevance, and asks for confirmation when unsure, exactly as requested.
 
-## 1. The Importance Ranker (Feature 2)
-Your memory engine no longer just blind fetches every piece of info. We programmed a sophisticated background ranking proxy.
+## 1. Database & Schema Expansion
+The PostgreSQL table (`memory_facts`) has safely received its new JSONB tracking columns (`affects`, `used_for`, `relations`). 
+Whenever a memory is saved, these arrays dictate how that specific fact ripples through the rest of the application.
 
-### A. The Algorithm
-Whenever memories are retrieved, `memory_engine.py` now runs `_record_access_and_recalculate()`. This dynamically rates the truthfulness/usefulness of a fact based on:
-1. **Category Weight:** Financial=1.0, Profile=0.8, Preference=0.5, Event=0.3.
-2. **Recency:** Automatically scales down math based on days since the last update.
-3. **Frequency:** Mathematical division measuring access-count against days-alive.
-4. **Access:** A direct track of how many times the agent needed to look at it.
+## 2. The Intelligence Engines (`backend/services/`)
+We spun up three entirely new rule-based microservices that intercept data *before* it gets saved:
+- **`memory_connections.py`**: Intersects the logic. If you tell it your `income`, this engine automatically flags that memory as affecting `["loan_eligibility", "emi_capacity"]`.
+- **`dependency_engine.py`**: Tracks downstream cascade effects. Whenever `co_applicant_income` is updated, the engine alerts the memory context: `"Dependencies flagged for recalculation: combined_income"`.
+- **`consistency.py`**: The logic gatekeeper. It cross-references new facts against your existing profile. If it detects a conflict (e.g. tracking a co-applicant income when your profile clearly says "No Co-applicant"), it throws raw Warning strings into your API response payload.
 
-The database `memory_facts` schema was updated to correctly track `access_count` and `last_accessed_at`.
+## 3. Dynamic Importance & Context Limits
+- The scoring engine (`backend/memory_engine.py`) now runs your precise formula: `(0.5 * category) + (0.3 * recency) + (0.2 * min(access_count/5, 1))`.
+- The `context_builder.py` rigorously limits the final LLM prompt to only the **Top 5** mathematical facts.
+- It also swaps raw backend timestamps out for the new **Temporal Engine**, using conversational tags like `"recently"` and `"earlier"`. 
 
-### B. Top-K Injector
-In `main.py`, I replaced the naive `get_active_facts` fetcher with `get_relevant_facts(..., limit=8)`. 
-The agent will now only ever pull a maximum of **8** facts into its memory context prompt. It prioritizes data directly answering the user's intent, and backfills the rest exclusively with the highest-importance facts.
-
-## 2. Prompt Constraint Overhaul
-The prompt logic inside `context_builder.py` was directly rewired to strictly enforce your core architectural differentiators:
-
-1. **Default English Override:** The LLM is now hard-prompted to assume English. It will only utilize Hindi if the user explicitly triggers it by typing in Hindi themselves.
-2. **Natural Conversational Delivery:** Sentences like "Do not list facts mechanically" were reinforced. I strictly guided the LLM to blend it into paragraph flow without sounding like a database.
-3. **Reasoning Explanation:** As requested in the architecture, the LLM is now explicitly instructed: 
-   > *"CRITICAL: When using facts from memory, optionally explain **why** you are considering them (e.g., 'I considered your co-applicant because it positively affects your eligibility...')."*
+## 4. API Visibility & Soft Clarification
+The `/chat` and `/chat/stream` endpoints have been massively leveled up:
+1. **Confidence Gate**: If the fact extractor has a confidence `< 0.7`, the API will *not* store it in the database. Instead, it generates a `clarification` attribute (e.g. `"Should I store your income as 8L?"`) while still gracefully generating a normal response.
+2. **Memory Influence Tracking**: The API payload now returns precisely *what* memories it chose to use (`used_memory`) and *why* it used them (e.g. `reason: "These affect loan_eligibility"`). 
+3. **Proactive Suggestions**: The system will actively drop automated suggestions (e.g., suggesting better eligibility when a co-applicant is detected).

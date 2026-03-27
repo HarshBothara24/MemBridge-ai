@@ -33,17 +33,12 @@ def calculate_importance(fact: Dict[str, Any], current_time: datetime) -> float:
     days_since_update = max((current_time - updated_at).days, 0)
     w2_val = 1.0 / (1.0 + days_since_update)
 
+    w2_val = 1.0 / (1.0 + days_since_update)
+
     # 3. Frequency & Access
     access_count = fact.get("access_count", 0)
-    created_at = fact.get("created_at")
-    if not isinstance(created_at, datetime):
-        created_at = current_time
-    days_since_creation = max((current_time - created_at).days, 0)
     
-    w3_val = access_count / (days_since_creation + 1.0)
-    w4_val = min(access_count * 0.1, 1.0)
-
-    score = (0.4 * w1_val) + (0.3 * w2_val) + (0.2 * w3_val) + (0.1 * w4_val)
+    score = (0.5 * w1_val) + (0.3 * w2_val) + (0.2 * min(access_count / 5.0, 1.0))
     return round(score, 4)
 
 def _record_access_and_recalculate(facts: List[Dict[str, Any]]):
@@ -120,6 +115,9 @@ def upsert_fact(
     confidence: float = 0.8,
     source: str = "user",
     type_: str = "profile",
+    affects: List[str] = None,
+    used_for: List[str] = None,
+    relations: List[str] = None,
 ) -> Dict[str, Any]:
     """
     Insert or update a memory fact.
@@ -146,6 +144,9 @@ def upsert_fact(
 
         new_version = 1
         json_value = to_jsonb(value)
+        affects_json = to_jsonb(affects or [])
+        used_for_json = to_jsonb(used_for or [])
+        relations_json = to_jsonb(relations or [])
 
         if existing:
             old_value = existing["value"]
@@ -181,11 +182,11 @@ def upsert_fact(
         # Insert new fact
         cur.execute(
             """
-            INSERT INTO memory_facts (user_id, type, key, value, confidence, version, source)
-            VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s)
-            RETURNING id, user_id, type, key, value, confidence, importance_score, version, status, source, created_at, updated_at
+            INSERT INTO memory_facts (user_id, type, key, value, confidence, version, source, affects, used_for, relations)
+            VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
+            RETURNING id, user_id, type, key, value, confidence, importance_score, version, status, source, created_at, updated_at, affects, used_for, relations
             """,
-            (user_id, type_, key, json_value, confidence, new_version, source),
+            (user_id, type_, key, json_value, confidence, new_version, source, affects_json, used_for_json, relations_json),
         )
         new_fact = cur.fetchone()
         logger.info(
@@ -214,6 +215,9 @@ def upsert_facts(
             confidence=fact.get("confidence", 0.8),
             source=source,
             type_=fact.get("type", "profile"),
+            affects=fact.get("affects", []),
+            used_for=fact.get("used_for", []),
+            relations=fact.get("relations", []),
         )
         results.append(result)
     return results

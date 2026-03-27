@@ -1,46 +1,45 @@
-# Importance Scoring & Relevance Ranking Implementation Plan
+# Memory System Advanced Intelligence Upgrade Plan
 
-This plan addresses Feature 2: implementing the mathematical `importance` score formula, tracking read accesses, and returning the top-K facts so we don't overwhelm the LLM with all memories.
+This plan outlines a modular, non-destructive upgrade to evolve the current system from a "memory storage" engine into a "connected, reasoning-aware" memory architecture without introducing vector databases or extra LLM latency.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> The prompt specified the following formula: `importance = w1 * category_weight + w2 * recency + w3 * frequency + w4 * access_count`
-> I plan to define the weights and proxies as follows:
-> - **Category Weight (`w1`)**: Financial = 1.0, Profile = 0.8, Preference = 0.5, Event = 0.3.
-> - **Recency (`w2`)**: Calculated as `1.0 / (1.0 + days_since_updated)`. Diminishes smoothly over time.
-> - **Frequency (`w3`)**: Calculated as `access_count / (days_since_created + 1)`.
-> - **Access Count (`w4`)**: Normalized raw number of times accessed.
-> To handle the constraint to "Store and update this dynamically", I will execute a background `UPDATE` mathematically recalculating everyone's importance score instantly whenever a memory is retrieved.
+> The prompt requires `clarification` responses when a fact has `< 0.7` confidence.
+> This will essentially "short-circuit" the standard LLM chat completion. If an extracted fact has low confidence, the API will instantly return the `clarification` question instead of generating an LLM response based on the uncertain facts. Please confirm if this immediate short-circuiting behavior is acceptable for the user experience.
 
 ## Proposed Changes
 
-### Database Schema (`backend/db.py`)
+### Database Upgrades (`backend/db.py`)
 - **[MODIFY]** `backend/db.py`
-  - Safely add new tracking columns to the `memory_facts` table:
-    ```sql
-    ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0;
-    ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMP DEFAULT NOW();
-    ```
+  - Safely execute `ALTER TABLE memory_facts` commands within `init_db()` to append the new metadata columns: `affects` (JSONB), `used_for` (JSONB), and `relations` (JSONB).
 
-### Scoring Logic (`backend/memory_engine.py`)
+### New Services Layer (`backend/services/`)
+- **[NEW]** `backend/services/memory_connections.py`
+  - Expose `attach_relationships(fact)`. Applies a static rule-base (e.g., `income` automatically flags `["loan_eligibility", "emi_capacity"]` in the `affects` column). Will be injected directly between fact extraction and DB upserting.
+- **[NEW]** `backend/services/dependency_engine.py`
+  - Expose `track_dependencies(updated_keys)`. Determines which downstream values become "stale" due to an updated memory (e.g., updating `co_applicant` dynamically flags `combined_income` as needing recalculation). These notes will be attached to the memory context.
+- **[NEW]** `backend/services/consistency.py`
+  - Expose `detect_conflicts(extracted_facts, active_profile)`. Runs logic gates (e.g., `extracted income < 40k` AND `requested loan > 10M` = **Warning**). This engine outputs raw warning strings that funnel directly into the API response schema.
+
+### Core Logic Upgrades
 - **[MODIFY]** `backend/memory_engine.py`
-  - **`calculate_importance`**: Introduce a private python method measuring `w1 * category + w2 * recency + w3 * freq + w4 * access`.
-  - **Tracking on Retrieval**: Update `get_facts_by_keys` and `get_active_facts` to increment `access_count` on all fetched rows, update `last_accessed_at`, and recalculate the `importance_score`. 
-  - **Ranking (Top-K)**: Introduce a `get_relevant_facts(user_id, intent_keys, limit=10)` method. This strictly orders the results by `importance_score DESC` and guarantees we only inject the most critically relevant memories to the agent context.
+  - **Scoring Replacement**: Tweak `calculate_importance()` to follow the precise formula: `(0.5 * category) + (0.3 * recency) + (0.2 * min(access_count/5, 1))`.
+- **[MODIFY]** `backend/context_builder.py`
+  - **Temporal Phrasing**: Integrate the `temporal.py` recency calculator to convert bare timestamps into spoken phrases within the synthesized prompt (e.g., `"You mentioned today your income is 10L"` instead of `"Income: 10L"`).
+  - Limit the builder explicitly to 5-6 memory items constraint.
+- **[MODIFY]** `backend/temporal.py`
+  - Export a lightweight `compute_recency_label(timestamp)` that buckets times into `"today"`, `"recently"`, and `"earlier"`.
 
-### Inference Layer (`backend/main.py`)
+### API & Response Modifications (`backend/main.py`)
 - **[MODIFY]** `backend/main.py`
-  - In our `/chat` and `/chat/stream` endpoints, replace direct `get_facts_by_keys` with the new Top-K `get_relevant_facts(..., limit=8)`. This satisfies the constraint: "Retrieve and inject *only relevant* memory".
-
-## Open Questions
-
-1. **Top-K Limit:** I am planning to cap the memory context to the top `8` most mathematically relevant facts. Do you want a different explicit cap for the context limit?
-2. **Weights Selection:** Are you okay with the generic decimal weights I've outlined above for the categories, or do you have a specific preference (e.g., setting Financial to 2.0)?
+  - **Confidence Filter**: Add a gatekeeper post-extraction. If `confidence < 0.7`, abort the DB upsert, abort the LLM generation, and return a `ChatResponse` containing just the `"clarification"` property.
+  - **Response Payload Changes**: Augment `ChatRequest`/`ChatResponse` models to strictly return the new `warnings` (from Consistency Engine), `used_memory` (keys injected into the prompt), and `reason` trackers.
+  - **Proactive Suggestions**: Weave explicit rules (e.g., `has_co_applicant` -> `suggest enhanced eligibility`) into the `suggestions` response pipeline.
 
 ## Verification Plan
 
 ### Automated Tests
-1. Add a fact and fetch it.
-2. Read the database directly to confirm `access_count` increments from 0 to 1, and the `importance_score` gets recomputed dynamically.
-3. Check the prompt context length limits to ensure we are successfully slicing the memory context rather than injecting indiscriminate tables.
+1. **Schema Integrity:** Verify database runs cleanly with old data alongside the new JSONB arrays.
+2. **Confidence Lockout:** Inject a fuzzy message ("maybe I make 10 dollars"), force the extractor to give it `<0.7`, and verify the API returns the strict `clarification` payload without hallucinating a response.
+3. **Consistency Warning:** Intentionally trigger an income/loan amount paradox to verify the `warnings` array populates properly in the response JSON.
