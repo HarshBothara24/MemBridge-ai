@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { sendMessageStream } from '../services/api'
+import { sendMessageStream, sendVoiceMessage } from '../services/api'
 import './Chat.css'
 
 const FACT_LABELS = {
@@ -34,8 +34,11 @@ export default function Chat({ customerId, onMemoryUpdate }) {
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [suggestions, setSuggestions] = useState([])
+  const [recording, setRecording] = useState(false)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -141,6 +144,74 @@ export default function Chat({ customerId, onMemoryUpdate }) {
     }
   }
 
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioChunksRef.current = []
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        await handleVoiceSend(blob)
+      }
+
+      recorder.start()
+      setRecording(true)
+    } catch (err) {
+      console.error('Mic access denied:', err)
+      alert('Microphone access is required for voice input.')
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setRecording(false)
+  }
+
+  async function handleVoiceSend(audioBlob) {
+    setLoading(true)
+    setMessages((prev) => [...prev, { role: 'user', text: '🎤 Voice message...', facts: [], isVoice: true }])
+
+    try {
+      const result = await sendVoiceMessage(audioBlob, customerId)
+
+      if (result.error) throw new Error(result.error)
+
+      // Update user message with transcription
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
+          text: result.transcription || '🎤 Voice message',
+          facts: result.extracted_facts || [],
+        }
+        return updated
+      })
+
+      // Add AI response
+      setMessages((prev) => [...prev, { role: 'ai', text: result.text, facts: [], isVoice: true, audioUrl: result.audio_url, language: result.language }])
+
+      // Auto-play audio response
+      if (result.audio_url) {
+        const audio = new Audio(result.audio_url)
+        audio.play().catch(() => {})
+      }
+
+      if (onMemoryUpdate) onMemoryUpdate()
+    } catch (err) {
+      console.error('Voice error:', err)
+      setMessages((prev) => [...prev, { role: 'ai', text: 'Voice processing failed. Please try again.', facts: [] }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function formatTime() {
     return new Date().toLocaleTimeString('en-IN', {
       hour: '2-digit',
@@ -187,6 +258,15 @@ export default function Chat({ customerId, onMemoryUpdate }) {
                 <span className="msg-time">
                   {msg.role === 'user' ? 'SENT' : formatTime()}
                 </span>
+                {msg.role === 'ai' && msg.isVoice && msg.audioUrl && (
+                  <button
+                    className="replay-btn"
+                    onClick={() => new Audio(msg.audioUrl).play()}
+                    title="Replay audio"
+                  >
+                    <span className="material-symbols-outlined">volume_up</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -252,12 +332,23 @@ export default function Chat({ customerId, onMemoryUpdate }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={loading || streaming}
+              disabled={loading || streaming || recording}
             />
+            <button
+              className={`mic-btn ${recording ? 'recording' : ''}`}
+              onClick={recording ? stopRecording : startRecording}
+              disabled={loading || streaming}
+              aria-label={recording ? 'Stop recording' : 'Click to speak'}
+              title={recording ? 'Click to stop' : 'Click to speak'}
+            >
+              <span className="material-symbols-outlined">
+                {recording ? 'stop_circle' : 'mic'}
+              </span>
+            </button>
             <button
               id="send-button"
               onClick={() => handleSend()}
-              disabled={loading || streaming || !input.trim()}
+              disabled={loading || streaming || !input.trim() || recording}
               aria-label="Send message"
             >
               <span className="material-symbols-outlined">arrow_upward</span>

@@ -113,3 +113,21 @@ export async function fetchHistory(customerId, limit = 20) {
   })
   return res.data.history || []
 }
+
+/**
+ * Send a voice recording to the /voice endpoint.
+ * Returns: { transcription, text, audio_url, language, extracted_facts }
+ */
+export async function sendVoiceMessage(audioBlob, customerId, sessionId = null) {
+  const formData = new FormData()
+  formData.append('audio', audioBlob, 'recording.webm')
+  formData.append('customer_id', customerId)
+  if (sessionId) formData.append('session_id', sessionId)
+
+  const res = await fetch(`${API_BASE}/voice`, {
+    method: 'POST',
+    body: formData,
+  })
+  if (!res.ok) throw new Error(`Voice request failed: ${res.status}`)
+  return res.json()
+}

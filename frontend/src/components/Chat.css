@@ -222,23 +222,32 @@
 }
 
 .chat-input-group {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 8px 8px 8px 20px;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-input-group:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg), 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .chat-input-group input {
-  width: 100%;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  flex: 1;
+  background: transparent;
+  border: none;
   outline: none;
   color: var(--text-primary);
-  padding: 16px 20px;
-  padding-right: 56px;
-  border-radius: var(--radius-xl);
+  padding: 8px 0;
   font-size: 14px;
   font-family: var(--font-body);
   font-weight: 500;
-  box-shadow: var(--shadow-md);
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .chat-input-group input::placeholder {
@@ -246,17 +255,16 @@
 }
 
 .chat-input-group input:focus {
-  border-color: var(--accent);
-  box-shadow: var(--shadow-lg), 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: unset;
+  box-shadow: unset;
 }
 
 .chat-input-group button {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  transform: none;
   width: 36px;
   height: 36px;
+  flex-shrink: 0;
   background: var(--bg-navy);
   color: var(--text-inverse);
   border: none;
@@ -266,14 +274,14 @@
   justify-content: center;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.1s, opacity 0.2s, background 0.2s;
+  transition: opacity 0.2s, background 0.2s, transform 0.1s;
 }
 
 .chat-input-group button:hover {
   background: var(--bg-navy-light);
 }
 
-.chat-input-group button:active { transform: translateY(-50%) scale(0.92); }
+.chat-input-group button:active { transform: scale(0.92); }
 .chat-input-group button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
@@ -363,4 +371,44 @@
   .chat-messages { padding: 20px 16px 160px; gap: 16px; }
   .chat-input-area { padding: 0 16px 16px; }
   .msg-bubble { padding: 12px 14px; font-size: 13px; }
+}
+
+/* ── Mic button ─────────────────────────────────────── */
+.mic-btn {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+
+.mic-btn:hover:not(:disabled) {
+  background: var(--accent-light) !important;
+  color: var(--accent) !important;
+}
+
+.mic-btn.recording {
+  background: #fee2e2 !important;
+  color: #ef4444 !important;
+  animation: pulse-mic 1s infinite;
+}
+
+@keyframes pulse-mic {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* ── Replay button ──────────────────────────────────── */
+.replay-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #888);
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.replay-btn:hover {
+  color: var(--accent, #4f6ef7);
 }

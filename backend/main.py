@@ -4,9 +4,10 @@ Cognitive Memory Layer with structured memory, intent-based retrieval,
 temporal reasoning, and bilingual (EN/HI) support.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import json
@@ -26,6 +27,9 @@ from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
 from llm_service import extract_facts_llm, generate_response, generate_response_stream
 from loan_calculator import get_calculation_context
+from services.stt_service import transcribe
+from services.tts_service import generate_audio
+from services.language_service import detect_language as detect_lang_voice
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,6 +57,10 @@ def on_startup():
 # Ensure static dirs exist
 os.makedirs("static/audio", exist_ok=True)
 os.makedirs("static/temp", exist_ok=True)
+
+app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 
 # ──────────────────────────────────────────────
@@ -297,3 +305,85 @@ def read_history(customer_id: str, limit: int = 20):
         if "created_at" in item and hasattr(item["created_at"], "isoformat"):
             item["created_at"] = item["created_at"].isoformat()
     return {"history": history}
+
+
+# ──────────────────────────────────────────────
+# Voice Endpoint
+# ──────────────────────────────────────────────
+@app.post("/voice")
+async def voice_chat(
+    audio: UploadFile = File(...),
+    customer_id: str = Form(...),
+    session_id: str = Form(None),
+):
+    """
+    Voice interaction endpoint.
+    1. Transcribe audio via Whisper
+    2. Detect language
+    3. Process via memory pipeline
+    4. Generate TTS audio response
+    Returns: { text, audio_url, language, transcription }
+    """
+    import tempfile
+
+    suffix = os.path.splitext(audio.filename or "audio.webm")[-1] or ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await audio.read())
+        tmp_path = tmp.name
+
+    try:
+        # 1. Transcribe
+        result = transcribe(tmp_path)
+        transcribed_text = result["text"]
+        whisper_lang = result["language"]
+
+        if not transcribed_text.strip():
+            return {"error": "Could not transcribe audio", "text": "", "audio_url": None, "language": "en"}
+
+        # 2. Language detection — combine Whisper hint + text heuristic
+        text_lang = detect_lang_voice(transcribed_text)
+        # Whisper lang takes priority for hi/en, text heuristic catches mixed
+        lang = text_lang if text_lang == "mixed" else whisper_lang
+
+        # 3. Process via existing memory pipeline
+        session = get_or_create_session(customer_id, session_id)
+        regex_facts = extract_facts(transcribed_text)
+        llm_facts = extract_facts_llm(transcribed_text)
+        merged = {f["key"]: f for f in llm_facts}
+        merged.update({f["key"]: f for f in regex_facts})
+        merged_facts = list(merged.values())
+
+        if merged_facts:
+            upsert_facts(customer_id, merged_facts)
+        save_chat_message(customer_id, session, "user", transcribed_text, merged_facts)
+
+        intent, memory_keys = classify_intent(transcribed_text)
+        relevant_facts = get_facts_by_keys(customer_id, memory_keys) if memory_keys else get_active_facts(customer_id)
+        memory_context = build_memory_context(relevant_facts, lang)
+        history = get_recent_history(customer_id, limit=6)
+        prompt = build_full_prompt(transcribed_text, memory_context, history, lang)
+
+        calc_context = get_calculation_context(transcribed_text, relevant_facts, lang)
+        if calc_context:
+            prompt = calc_context + "\n\n" + prompt
+
+        response_text = generate_response(prompt)
+        save_chat_message(customer_id, session, "assistant", response_text)
+
+        # 4. TTS
+        audio_filename = generate_audio(response_text, lang)
+        audio_url = f"{BASE_URL}/audio/{audio_filename}"
+
+        return {
+            "transcription": transcribed_text,
+            "text": response_text,
+            "audio_url": audio_url,
+            "language": lang,
+            "extracted_facts": [{"key": f["key"], "value": f["value"]} for f in merged_facts],
+        }
+
+    except Exception as e:
+        logger.error("Voice endpoint failed: %s", e)
+        return {"error": str(e), "text": "", "audio_url": None, "language": "en"}
+    finally:
+        os.unlink(tmp_path)
