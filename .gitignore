@@ -12,11 +12,14 @@ dist
 dist-ssr
 *.local
 
+<<<<<<< HEAD
 # Python virtual environments
 venv/
 .venv/
 env/
 
+=======
+>>>>>>> 0f6ed48 (whatever)
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -26,4 +29,53 @@ env/
 *.ntvs*
 *.njsproj
 *.sln
+<<<<<<< HEAD
 *.sw?
+=======
+*.sw?
+
+# Environments
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.venv
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+>>>>>>> 0f6ed48 (whatever)
