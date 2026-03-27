@@ -4,8 +4,13 @@ Convert raw timestamps into natural, human-readable relative time strings.
 Supports both English and Hindi output.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def _now_ist() -> datetime:
+    return datetime.now(IST).replace(tzinfo=None)
 
 # ──────────────────────────────────────────────
 # Day names
@@ -41,7 +46,7 @@ def humanize_timestamp(
         except ValueError:
             return timestamp  # return as-is if unparseable
 
-    now = reference or datetime.now()
+    now = reference or _now_ist()
     delta = now - timestamp
     days = delta.days
     seconds = delta.total_seconds()

@@ -6,7 +6,14 @@ import MemoryTimeline from './components/MemoryTimeline'
 import { fetchProfile, fetchTimeline } from './services/api'
 
 function App() {
-  const [customerId, setCustomerId] = useState('user_001')
+  const [customerId, setCustomerId] = useState(() => {
+    // Persist a unique user ID per browser session
+    const stored = sessionStorage.getItem('membridge_user_id')
+    if (stored) return stored
+    const newId = 'user_' + Math.random().toString(36).slice(2, 9)
+    sessionStorage.setItem('membridge_user_id', newId)
+    return newId
+  })
   const [profile, setProfile] = useState<{ total_facts?: number; [key: string]: unknown } | null>(null)
   const [timeline, setTimeline] = useState([])
   const [memoryVersion, setMemoryVersion] = useState(0)

@@ -7,7 +7,6 @@ temporal reasoning, and bilingual (EN/HI) support.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import json
@@ -27,7 +26,6 @@ from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
 from llm_service import extract_facts_llm, generate_response, generate_response_stream
 from loan_calculator import get_calculation_context
-from routes.call_routes import router as call_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,15 +50,9 @@ def on_startup():
     logger.info("MemBridge AI v2.0 — Cognitive Memory Layer ready.")
 
 
-# Ensure static dirs exist before mounting
+# Ensure static dirs exist
 os.makedirs("static/audio", exist_ok=True)
 os.makedirs("static/temp", exist_ok=True)
-
-# Static audio files for TTS output
-app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
-
-# Voice call routes
-app.include_router(call_router)
 
 
 # ──────────────────────────────────────────────

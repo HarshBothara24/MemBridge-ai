@@ -3,11 +3,16 @@ MemBridge AI — Memory Engine
 Core structured memory system with upsert, conflict handling, and retrieval.
 """
 
+from datetime import datetime, timedelta, timezone
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def _now_ist():
+    return datetime.now(IST).replace(tzinfo=None)
+
 import json
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
-
 from db import get_cursor, to_jsonb
 
 logger = logging.getLogger(__name__)
@@ -44,7 +49,7 @@ def calculate_importance(fact: Dict[str, Any], current_time: datetime) -> float:
 def _record_access_and_recalculate(facts: List[Dict[str, Any]]):
     """Increments access tracking and recalculates importance scores."""
     if not facts: return
-    now = datetime.now()
+    now = _now_ist()
     updates = []
     for fact in facts:
         fact["access_count"] = fact.get("access_count", 0) + 1

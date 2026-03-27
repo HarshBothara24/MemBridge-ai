@@ -128,8 +128,11 @@ def init_db():
     with get_cursor(dict_cursor=False) as cur:
         cur.execute(SCHEMA_SQL)
         # Safe migrations for existing deployments
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'profile';")
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS importance_score REAL DEFAULT 0.0;")
         cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0;")
         cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMP DEFAULT NOW();")
+        cur.execute("ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS session_id TEXT;")
     logger.info("Database schema initialized.")
 
 

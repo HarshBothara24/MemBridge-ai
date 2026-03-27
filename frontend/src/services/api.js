@@ -6,7 +6,7 @@ const API_BASE = 'http://localhost:8000'
  * Send a chat message and get full response with metadata (non-streaming).
  * Returns: { response, extracted_facts, intent, suggestions, language }
  */
-export async function sendMessage(message, customerId = 'user_001') {
+export async function sendMessage(message, customerId) {
   const res = await axios.post(`${API_BASE}/chat`, {
     message,
     customer_id: customerId,
@@ -23,7 +23,7 @@ export async function sendMessage(message, customerId = 'user_001') {
  * @param {function} onToken - Called with each token string as it arrives
  * @returns {Promise<string>} - Full response text when streaming completes
  */
-export async function sendMessageStream(message, customerId = 'user_001', onMeta, onToken) {
+export async function sendMessageStream(message, customerId, onMeta, onToken) {
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -37,32 +37,47 @@ function getConfidenceLevel(confidence) {
   return 'low'
 }
 
+function toUTCDate(isoString) {
+  if (!isoString) return null
+  // DB returns timestamps without timezone — treat as UTC by appending Z
+  const s = isoString.endsWith('Z') || isoString.includes('+') ? isoString : isoString + 'Z'
+  return new Date(s)
+}
+
 function formatDate(isoString) {
-  if (!isoString) return ''
-  const date = new Date(isoString)
+  const date = toUTCDate(isoString)
+  if (!date) return ''
   return date.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'Asia/Kolkata',
   })
 }
 
 function formatTime(isoString) {
-  if (!isoString) return ''
-  const date = new Date(isoString)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const date = toUTCDate(isoString)
+  if (!date) return ''
+  return date.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata',
+  })
 }
 
 function getRelativeDay(isoString) {
-  if (!isoString) return ''
-  const date = new Date(isoString)
+  const date = toUTCDate(isoString)
+  if (!date) return ''
   const now = new Date()
-  const diffDays = Math.floor((now - date) / 86400000)
 
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Yesterday'
-  if (diffDays < 7) {
-    return date.toLocaleDateString('en-IN', { weekday: 'long' })
+  const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
+  const dateStr = date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
+  const yesterdayStr = new Date(now - 86400000).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
+
+  if (dateStr === todayStr) return 'Today'
+  if (dateStr === yesterdayStr) return 'Yesterday'
+  if (now - date < 7 * 86400000) {
+    return date.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
   }
   return formatDate(isoString)
 }
@@ -70,7 +85,8 @@ function getRelativeDay(isoString) {
 function groupByDate(timeline) {
   const groups = {}
   for (const item of timeline) {
-    const dateStr = item.created_at ? new Date(item.created_at).toDateString() : 'Unknown'
+    const date = toUTCDate(item.created_at)
+    const dateStr = date ? date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Unknown'
     if (!groups[dateStr]) {
       groups[dateStr] = {
         label: getRelativeDay(item.created_at),

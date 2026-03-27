@@ -39,9 +39,15 @@ function getConfidenceLevel(confidence) {
   return 'low'
 }
 
+function toUTCDate(isoString) {
+  if (!isoString) return null
+  const s = isoString.endsWith('Z') || isoString.includes('+') ? isoString : isoString + 'Z'
+  return new Date(s)
+}
+
 function getTimeAgo(isoString) {
-  if (!isoString) return ''
-  const date = new Date(isoString)
+  const date = toUTCDate(isoString)
+  if (!date) return ''
   const now = new Date()
   const diffMs = now - date
   const diffMins = Math.floor(diffMs / 60000)
@@ -53,7 +59,7 @@ function getTimeAgo(isoString) {
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays === 1) return 'Yesterday'
   if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
 }
 
 export default function CustomerProfile({ profile, customerId }) {
