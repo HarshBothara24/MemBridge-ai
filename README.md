@@ -1,129 +1,130 @@
-# MemBridge AI
+# MemBridge AI — Cognitive Memory Layer for Private Banking
 
-A minimal full-stack AI chat app powered by a local Llama 3.2 model via Ollama, featuring an extraction-based memory system.
+A sophisticated full-stack AI platform designed to provide interactive, memory-aware banking assistance. Powered by a local Llama 3.2 model via Ollama, it features a robust temporal memory engine that extracts, versions, and recalls customer facts in real-time.
 
-**Stack:** React (Vite/TSX) + FastAPI + Ollama (llama3.2:3b)
-
----
-
-## Prerequisites
-
-Make sure you have these installed:
-
-- [Node.js](https://nodejs.org/) (v18+)
-- [Python](https://www.python.org/) (3.10+)
-- [Ollama](https://ollama.com/download) (for local AI)
+**Stack:** React (Vite/TS/JSX) + FastAPI + PostgreSQL + Ollama (llama3.2:3b)
 
 ---
 
-## Project Structure
+## 🌟 Key Features
 
-```text
-membridge-ai/
-├── backend/
-│   ├── main.py            # FastAPI app + Ollama integration
-│   ├── memory.py          # Fact extraction logic (Income, Loan Types)
-│   ├── requirements.txt   # Python dependencies
-│   ├── data/
-│   │   └── memory.json    # JSON storage for user profiles (Memory)
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx        # Root component (Vite/React)
-│   │   ├── components/
-│   │   │   ├── Chat.jsx   # Chat UI
-│   │   │   └── Sidebar.jsx # App Navigation/Sidebar
-│   └── tsconfig.app.json  # Configured for .jsx mixed-mode support
-└── README.md
+### 🧠 Advanced Memory Engine
+- **Hybrid Extraction:** Combines lightning-fast Regex rules with deep LLM semantic extraction to identify customer facts (income, loan types, eligibility, etc.).
+- **Temporal Reasoning:** Tracks fact versions over time. Updates are categorized as `Active` or `Superseded`, allowing you to see how a customer's profile has evolved.
+- **Intent-Based Retrieval:** Automatically classifies user intent (e.g., "loan inquiry", "income update") to fetch only the most relevant memory keys for context.
+- **Natural Language Context:** Built-in "Context Builder" ensures the AI never sees raw DB values, but instead receives a human-readable summary of the customer's history.
+
+### 🌐 Bilingual & Private
+- **Bilingual Support:** Full support for English and Hindi (Hinglish) with automatic language detection.
+- **Privacy-First:** All processing happens locally. No data ever leaves your device — no external APIs, no OpenAI/Anthropic dependencies.
+
+### 🖥️ 3-Panel Interactive UI
+- **Customer Profile:** Structured view of extracted facts with confidence levels, versioning, and "Time Ago" highlights.
+- **Chat Canvas:** Modern chat interface with real-time fact extraction pills, typing indicators, and intent-driven recall suggestions.
+- **Memory Timeline:** A chronological audit log of every memory interaction, showing exactly when facts were updated or replaced.
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    User((User)) -->|Interacts| Frontend[React Desktop App]
+    Frontend -->|API calls| Backend[FastAPI Server]
+    Backend -->|SQL Queries| DB[(PostgreSQL)]
+    Backend -->|Fast Extraction| Regex[Regex Engine]
+    Backend -->|Semantic Extraction| LLM[Ollama Llama 3.2]
+    Backend -->|Context Building| LLM
+    LLM -->|Response| Backend
+    Backend -->|Response + Metadata| Frontend
 ```
 
 ---
 
-## Setup & Run
+## 📁 Project Structure
 
-Follow these steps in order. Open three separate terminals.
+### Backend (`/backend`)
+- `main.py`: Entry point with FastAPI endpoints and core chat logic.
+- `db.py`: PostgreSQL connection pooling and schema migrations.
+- `memory_engine.py`: Logic for upserting, versioning, and retrieving facts.
+- `llm_service.py`: Interface for Ollama (llama3.2:3b) for extraction and generation.
+- `intent_router.py`: Classifies user messages into banking intents.
+- `context_builder.py`: Converts structured facts into natural language context.
+- `temporal.py`: Logic for handling chronological memory updates.
 
-### 1. Ollama (AI Model Setup)
+### Frontend (`/frontend`)
+- `src/App.tsx`: Layout orchestration and state management.
+- `src/components/`:
+    - `TopBar.jsx`: Identity switching and sync status.
+    - `Chat.jsx`: Interactive chat logic with fact highlights.
+    - `CustomerProfile.jsx`: Structured fact display with confidence tracking.
+    - `MemoryTimeline.jsx`: Chronological log of memory events.
+- `src/services/api.js`: Axios-based API client.
 
-First, download and install Ollama. Then, run these commands to set up the model:
+---
 
-https://ollama.com/download
+## ⚙️ Setup & Installation
 
+### 1. Prerequisites
+- **Node.js** (v18+)
+- **Python** (3.10+)
+- **PostgreSQL** (Running on `localhost:5432` with database `membridge`)
+- **Ollama** ([Download here](https://ollama.com/download))
+
+### 2. Ollama Setup
 ```bash
-# Pull the model (approx 2GB)
+# Pull the model
 ollama pull llama3.2:3b
 
-# Run the model locally
+# Ensure it's available locally
 ollama run llama3.2:3b
 ```
 
-*Keep this terminal open while using the app.*
+### 3. Backend Setup
+1. Configure `backend/db.py` with your database credentials.
+2. Install dependencies:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+3. Start the server:
+   ```bash
+   uvicorn main:app --reload
+   ```
 
-### 2. Backend (FastAPI)
-
-Navigate to the `backend` directory, install dependencies, and start the server:
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-*Server runs on:* [http://localhost:8000](http://localhost:8000)
-
-### 3. Frontend (React + Vite)
-
-Navigate to the `frontend` directory, install dependencies, and start the development server:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-*Frontend runs on:* [http://localhost:5173](http://localhost:5173)
+### 4. Frontend Setup
+1. Install dependencies:
+   ```bash
+   cd frontend
+   npm install
+   ```
+2. Start the dev server:
+   ```bash
+   npm run dev
+   ```
 
 ---
 
-## Recent Features & Improvements
+## 🛠️ API Reference
 
-### 🧠 Intelligent Memory System
-The assistant now extracts key information from user messages (using logic in `memory.py`) and stores them in `memory.json`. 
-- **Fact Extraction:** Automatically detects income, existing loans, and co-applicant details.
-- **Contextual Recall:** The assistant remembers your profile across conversations to provide personalized advice.
+### `POST /chat`
+The main interactive endpoint.
+- **Input:** `{ "message": "...", "customer_id": "..." }`
+- **Output:** `{ "response": "...", "extracted_facts": [...], "intent": "...", "suggestions": [...], "language": "..." }`
 
-### 🔧 TypeScript Integration Fix
-Updated the frontend configuration to support mixed `.tsx` and `.jsx` modules. 
-- **Change:** Enabled `allowJs: true` in `tsconfig.app.json`.
-- **Reason:** Allows `App.tsx` (TypeScript) to import native JSX components seamlessly.
+### `GET /memory/{customer_id}/profile`
+Returns the current active "Key Memory" for a user.
 
----
-
-## API Documentation
-
-`POST /chat`
-
-**Request:**
-```json
-{
-  "message": "Hi, I earn $50,000 and want a home loan.",
-  "customer_id": "user_123"
-}
-```
-
-**Response:**
-```json
-{
-  "response": "Hello! I've noted that you earn $50,000. Based on that, I can suggest several home loan options..."
-}
-```
+### `GET /memory/{customer_id}/timeline`
+Returns the chronological history of all memory updates.
 
 ---
 
-## Troubleshooting
+## 🛡️ Database Schema
+The system automatically initializes two main tables:
+1. `memory_facts`: Stores structured JSONB values, confidence scores, and versioning info.
+2. `chat_history`: Stores the full dialogue history with metadata for session persistence.
 
-| Problem | Fix |
-|---|---|
-| `Ollama not responding` | Ensure `ollama run llama3.2:3b` is running in a terminal. |
-| `Connection refused` | Make sure the backend (Uvicorn) is running on port 8000. |
-| `CORS Error` | Ensure the frontend is on port 5173 (standard Vite development port). |
-| `Implicit any` on imports | This is fixed! We enabled JavaScript support in the TypeScript config. |
+---
+
+© 2026 MemBridge AI — Private, Cognitive, Intelligent.

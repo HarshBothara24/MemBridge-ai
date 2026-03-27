@@ -1,5 +1,4 @@
 fastapi
 uvicorn
 requests
-faiss-cpu
-sentence-transformers
+psycopg2-binary

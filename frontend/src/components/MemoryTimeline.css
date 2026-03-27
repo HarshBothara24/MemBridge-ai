@@ -1,0 +1,268 @@
+/* ── Memory Timeline (Right Panel) ──────────────────── */
+
+.memory-timeline {
+  width: var(--panel-width);
+  min-width: var(--panel-width);
+  height: 100%;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-in-right 0.3s ease;
+}
+
+@media (max-width: 1200px) {
+  .memory-timeline { display: none; }
+}
+
+/* Header */
+.timeline-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.timeline-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.timeline-header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-header-icon .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.timeline-header h2 {
+  font-family: var(--font-headline);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.timeline-header p {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding-left: 42px;
+}
+
+/* Timeline content */
+.timeline-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 16px 20px;
+}
+
+/* Date separator */
+.timeline-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 8px;
+  padding: 0 4px;
+}
+
+.timeline-date:first-child {
+  margin-top: 0;
+}
+
+.timeline-date-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.timeline-date-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-light);
+}
+
+/* Timeline items */
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 8px;
+  position: relative;
+  animation: fade-in 0.3s ease both;
+}
+
+/* Vertical line connector */
+.timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 42px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--border-light);
+}
+
+.timeline-dot-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-dot {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 0 0 2px var(--border-light);
+}
+
+.timeline-dot.active {
+  box-shadow: 0 0 0 2px var(--success);
+}
+
+.timeline-dot.superseded {
+  box-shadow: 0 0 0 2px var(--text-tertiary);
+  opacity: 0.5;
+}
+
+.timeline-dot.income   { background: #DBEAFE; }
+.timeline-dot.loan     { background: #E0E7FF; }
+.timeline-dot.person   { background: #D1FAE5; }
+.timeline-dot.document { background: #FEF3C7; }
+.timeline-dot.work     { background: #FCE7F3; }
+.timeline-dot.score    { background: #CFFAFE; }
+.timeline-dot.age      { background: #F3E8FF; }
+.timeline-dot.property { background: #FEE2E2; }
+.timeline-dot.default  { background: var(--bg-tertiary); }
+
+.timeline-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-fact-key {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.timeline-fact-value {
+  font-family: var(--font-headline);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.timeline-fact-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.timeline-time {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.timeline-version {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.timeline-status {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+
+.timeline-status.active {
+  background: var(--success-light);
+  color: #059669;
+}
+
+.timeline-status.superseded {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+/* Confidence dot */
+.confidence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.confidence-dot.high   { background: var(--success); }
+.confidence-dot.medium { background: var(--warning); }
+.confidence-dot.low    { background: var(--error); }
+
+/* Empty state */
+.timeline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.timeline-empty .material-symbols-outlined {
+  font-size: 44px;
+  margin-bottom: 12px;
+  opacity: 0.25;
+}
+
+.timeline-empty p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Live indicator */
+.timeline-live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: var(--success-light);
+  width: fit-content;
+  font-size: 10px;
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 12px;
+}
+
+.timeline-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-soft 1.5s ease-in-out infinite;
+}

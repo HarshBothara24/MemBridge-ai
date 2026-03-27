@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:18
+    container_name: membridge-ai
+    restart: always
+
+    environment:
+      POSTGRES_DB: membridge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - pgdata:/var/lib/postgresql   # ✅ REQUIRED for Postgres 18
+
+    networks:
+      - membridge-net
+
+networks:
+  membridge-net:
+
+volumes:
+  pgdata:

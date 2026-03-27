@@ -1,97 +1,96 @@
 /* ─────────────────────────────────────────────────────────
-   MemBridge AI — Design System (converted from Stitch)
+   MemBridge AI — Design System v2 (Light Fintech Theme)
+   Clean, professional banking aesthetic.
+   White / Light Grey / Navy Blue
    ───────────────────────────────────────────────────────── */
 
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  /* ── Surface / Background palette ──────────────────── */
-  --surface-dim:                #0a0e13;
-  --surface:                    #0a0e13;
-  --surface-bright:             #1e2d3e;
-  --surface-variant:            #1a2735;
-  --surface-container-lowest:   #000000;
-  --surface-container-low:      #0e141b;
-  --surface-container:          #121a23;
-  --surface-container-high:     #16202c;
-  --surface-container-highest:  #1a2735;
+  /* ── Background ────────────────────────────────── */
+  --bg-primary:       #F8F9FC;
+  --bg-secondary:     #FFFFFF;
+  --bg-tertiary:      #F1F5F9;
+  --bg-elevated:      #FFFFFF;
+  --bg-navy:          #1B2A4A;
+  --bg-navy-light:    #2D4A7A;
+  --bg-navy-subtle:   #EEF2FF;
 
-  /* ── Primary ───────────────────────────────────────── */
-  --primary:                    #c4c7ca;
-  --primary-dim:                #b6b9bd;
-  --primary-container:          #44474a;
-  --on-primary:                 #3d4044;
-  --on-primary-container:       #ced0d4;
+  /* ── Text ──────────────────────────────────────── */
+  --text-primary:     #1E293B;
+  --text-secondary:   #64748B;
+  --text-tertiary:    #94A3B8;
+  --text-inverse:     #FFFFFF;
+  --text-navy:        #1B2A4A;
 
-  /* ── Secondary ─────────────────────────────────────── */
-  --secondary:                  #979eaa;
-  --secondary-container:        #353c46;
-  --on-secondary:               #1a212a;
-  --on-secondary-container:     #b9c0cc;
+  /* ── Accent ────────────────────────────────────── */
+  --accent:           #3B82F6;
+  --accent-light:     #DBEAFE;
+  --accent-dark:      #1D4ED8;
 
-  /* ── Tertiary ──────────────────────────────────────── */
-  --tertiary:                   #e4ebff;
-  --tertiary-dim:               #c3cfeb;
-  --tertiary-container:         #d1ddfa;
+  /* ── Status ────────────────────────────────────── */
+  --success:          #10B981;
+  --success-light:    #D1FAE5;
+  --warning:          #F59E0B;
+  --warning-light:    #FEF3C7;
+  --error:            #EF4444;
+  --error-light:      #FEE2E2;
 
-  /* ── Text / On-surface ─────────────────────────────── */
-  --on-surface:                 #dae6fa;
-  --on-surface-variant:         #9facbe;
-  --on-background:              #dae6fa;
+  /* ── Borders ───────────────────────────────────── */
+  --border:           #E2E8F0;
+  --border-light:     #F1F5F9;
+  --border-focus:     #3B82F6;
 
-  /* ── Outline ───────────────────────────────────────── */
-  --outline:                    #6a7687;
-  --outline-variant:            #3d4958;
+  /* ── Shadows ───────────────────────────────────── */
+  --shadow-sm:        0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:        0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg:        0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-xl:        0 16px 48px rgba(0, 0, 0, 0.1);
 
-  /* ── Error ─────────────────────────────────────────── */
-  --error:                      #ee7d77;
-  --error-container:            #7f2927;
-  --on-error:                   #490106;
-  --on-error-container:         #ff9993;
-  --error-dim:                  #bb5551;
+  /* ── Fonts ─────────────────────────────────────── */
+  --font-headline:    'Manrope', system-ui, -apple-system, sans-serif;
+  --font-body:        'Inter', system-ui, -apple-system, sans-serif;
 
-  /* ── Misc ─────────────────────────────────────────── */
-  --surface-tint:               #c4c7ca;
-  --inverse-surface:            #f8f9ff;
-  --inverse-on-surface:         #51555b;
-  --inverse-primary:            #5c5f63;
+  /* ── Radii ─────────────────────────────────────── */
+  --radius-sm:        4px;
+  --radius-md:        8px;
+  --radius-lg:        12px;
+  --radius-xl:        16px;
+  --radius-2xl:       20px;
+  --radius-full:      9999px;
 
-  /* ── Fonts ────────────────────────────────────────── */
-  --font-headline: 'Manrope', sans-serif;
-  --font-body:     'Inter', sans-serif;
-  --font-label:    'Inter', sans-serif;
-
-  /* ── Radii ────────────────────────────────────────── */
-  --radius-sm:   0.125rem;
-  --radius-md:   0.25rem;
-  --radius-lg:   0.5rem;
-  --radius-xl:   0.75rem;
-  --radius-2xl:  1rem;
-  --radius-full: 9999px;
+  /* ── Layout ────────────────────────────────────── */
+  --topbar-height:    56px;
+  --panel-width:      300px;
 
   font-family: var(--font-body);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ── Reset & base ───────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background-color: var(--surface);
-  color: #e5e7eb;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: var(--font-body);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 ::selection {
-  background: rgba(196, 199, 202, 0.3);
-  color: var(--on-surface);
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--text-primary);
 }
 
 #root {
   width: 100%;
   height: 100svh;
   display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -100,22 +99,50 @@ body {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* ── Glass panel ────────────────────────────────────── */
-.glass-panel {
-  background: rgba(26, 39, 53, 0.6);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+/* ── Custom scrollbar ───────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar        { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track   { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb   { background: var(--border); border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* ── Main layout ────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  overflow: hidden;
 }
 
-/* ── Custom scrollbar ───────────────────────────────── */
-.custom-scrollbar::-webkit-scrollbar        { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track   { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb   { background: var(--outline-variant); border-radius: 10px; }
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
 
 /* ── Animations ─────────────────────────────────────── */
-@keyframes pulse-dot {
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-soft {
   0%, 100% { opacity: 1; }
-  50%      { opacity: 0.5; }
+  50%      { opacity: 0.6; }
 }
 
 @keyframes bounce-dot {
@@ -123,12 +150,24 @@ body {
   50%      { transform: translateY(-4px); }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Utility ────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
