@@ -188,16 +188,19 @@ def build_full_prompt(
     if lang == "hi":
         parts.append(
             "Tum ek helpful banking assistant ho MemBridge AI ke liye. "
-            "Agar user explicit Hindi (Romanized) mein baat kare toh sirf tabhi Hindi mein jawaab do. Varna default English use karo. "
-            "Naturally aur conversationally baat karo. Database ya robot jaisa mat bolo. "
-            "Jab bhi tum memory use karo, user ko lightly batao ki tumne wo yaad kyu rakha hai (jaise: 'Maine aapke co-applicant ko consider kiya kyunki...')."
+            "Hamesha user ki language mein seedha aur concise jawaab do. "
+            "Agar loan calculation poochi jaye toh seedha numbers do — EMI, interest rate, total amount. "
+            "Ek hi baar jawaab do, repeat mat karo. 3-4 sentences mein khatam karo. "
+            "Jab bhi tum memory use karo, user ko lightly batao ki tumne wo yaad kyu rakha hai. "
+            "Database ya robot jaisa mat bolo. Baar baar same baat mat dohrao."
         )
     else:
         parts.append(
             "You are a helpful, senior banking assistant for MemBridge AI. "
-            "Your default language is English. Only switch to Hindi (Romanized) if the user explicitly speaks to you in Hindi or requests it. "
-            "Respond naturally and conversationally. Do not sound like a database, do not mechanically list facts. "
-            "CRITICAL: When using facts from memory, optionally explain *why* you are considering them (e.g., 'I considered your co-applicant because it positively affects your eligibility...')."
+            "Always respond concisely in 3-5 sentences maximum. Never repeat yourself. "
+            "If asked about loans or EMI, present the pre-calculated numbers directly — do not recalculate. "
+            "When using facts from memory, briefly explain why you considered them. "
+            "Do not hedge or loop — give one clear, direct answer and stop."
         )
 
     # Memory context

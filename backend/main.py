@@ -7,10 +7,14 @@ temporal reasoning, and bilingual (EN/HI) support.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import json
 import logging
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 from db import init_db
 from memory import extract_facts
@@ -22,6 +26,8 @@ from memory_engine import (
 from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
 from llm_service import extract_facts_llm, generate_response, generate_response_stream
+from loan_calculator import get_calculation_context
+from routes.call_routes import router as call_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,6 +50,17 @@ def on_startup():
     """Initialize database on startup."""
     init_db()
     logger.info("MemBridge AI v2.0 — Cognitive Memory Layer ready.")
+
+
+# Ensure static dirs exist before mounting
+os.makedirs("static/audio", exist_ok=True)
+os.makedirs("static/temp", exist_ok=True)
+
+# Static audio files for TTS output
+app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
+
+# Voice call routes
+app.include_router(call_router)
 
 
 # ──────────────────────────────────────────────
@@ -123,6 +140,12 @@ def chat(req: ChatRequest):
 
     # 8. Build full prompt and generate response
     prompt = build_full_prompt(req.message, memory_context, history, lang)
+
+    # Inject pre-computed loan calculations if applicable
+    calc_context = get_calculation_context(req.message, relevant_facts, lang)
+    if calc_context:
+        prompt = calc_context + "\n\n" + prompt
+
     logger.info("Prompt length: %d chars", len(prompt))
 
     response = generate_response(prompt)
@@ -207,6 +230,11 @@ def chat_stream(req: ChatRequest):
     memory_context = build_memory_context(relevant_facts, lang)
     history = get_recent_history(req.customer_id, limit=6)
     prompt = build_full_prompt(req.message, memory_context, history, lang)
+
+    # Inject pre-computed loan calculations if applicable
+    calc_context = get_calculation_context(req.message, relevant_facts, lang)
+    if calc_context:
+        prompt = calc_context + "\n\n" + prompt
 
     # 8. Generate suggestions (sent as first chunk before streaming starts)
     all_facts = get_active_facts(req.customer_id)
