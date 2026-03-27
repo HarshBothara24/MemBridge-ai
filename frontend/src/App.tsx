@@ -7,7 +7,7 @@ import { fetchProfile, fetchTimeline } from './services/api'
 
 function App() {
   const [customerId, setCustomerId] = useState('user_001')
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState<{ total_facts?: number; [key: string]: unknown } | null>(null)
   const [timeline, setTimeline] = useState([])
   const [memoryVersion, setMemoryVersion] = useState(0)
 
