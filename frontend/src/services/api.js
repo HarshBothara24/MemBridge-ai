@@ -6,7 +6,7 @@ const API_BASE = 'http://localhost:8000'
  * Send a chat message and get full response with metadata.
  * Returns: { response, extracted_facts, intent, suggestions, language }
  */
-export async function sendMessage(message, customerId = 'user_001') {
+export async function sendMessage(message, customerId) {
   const res = await axios.post(`${API_BASE}/chat`, {
     message,
     customer_id: customerId,

@@ -6,7 +6,45 @@ import MemoryTimeline from './components/MemoryTimeline'
 import { fetchProfile, fetchTimeline } from './services/api'
 
 function App() {
-  const [customerId, setCustomerId] = useState('user_001')
+  const [customerId, setCustomerId] = useState<string>(() => {
+    return localStorage.getItem('membridge_user_id') || ''
+  })
+  const [loginInput, setLoginInput] = useState('')
+
+  function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    const id = loginInput.trim()
+    if (!id) return
+    localStorage.setItem('membridge_user_id', id)
+    setCustomerId(id)
+  }
+
+  function handleCustomerChange(id: string) {
+    localStorage.setItem('membridge_user_id', id)
+    setCustomerId(id)
+  }
+
+  if (!customerId) {
+    return (
+      <div className="login-screen">
+        <div className="login-card">
+          <span className="material-symbols-outlined login-icon">neurology</span>
+          <h2>MemBridge AI</h2>
+          <p>Enter your Customer ID to continue</p>
+          <form onSubmit={handleLogin}>
+            <input
+              className="login-input"
+              value={loginInput}
+              onChange={(e) => setLoginInput(e.target.value)}
+              placeholder="e.g. user_001"
+              autoFocus
+            />
+            <button className="login-btn" type="submit">Continue</button>
+          </form>
+        </div>
+      </div>
+    )
+  }
   const [profile, setProfile] = useState(null)
   const [timeline, setTimeline] = useState([])
   const [memoryVersion, setMemoryVersion] = useState(0)
@@ -38,7 +76,7 @@ function App() {
     <div className="app-layout">
       <TopBar
         customerId={customerId}
-        onCustomerChange={setCustomerId}
+        onCustomerChange={handleCustomerChange}
         totalFacts={profile?.total_facts || 0}
       />
       <div className="app-body">
