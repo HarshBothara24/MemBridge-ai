@@ -1,0 +1,134 @@
+/* ─────────────────────────────────────────────────────────
+   MemBridge AI — Design System (converted from Stitch)
+   ───────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Surface / Background palette ──────────────────── */
+  --surface-dim:                #0a0e13;
+  --surface:                    #0a0e13;
+  --surface-bright:             #1e2d3e;
+  --surface-variant:            #1a2735;
+  --surface-container-lowest:   #000000;
+  --surface-container-low:      #0e141b;
+  --surface-container:          #121a23;
+  --surface-container-high:     #16202c;
+  --surface-container-highest:  #1a2735;
+
+  /* ── Primary ───────────────────────────────────────── */
+  --primary:                    #c4c7ca;
+  --primary-dim:                #b6b9bd;
+  --primary-container:          #44474a;
+  --on-primary:                 #3d4044;
+  --on-primary-container:       #ced0d4;
+
+  /* ── Secondary ─────────────────────────────────────── */
+  --secondary:                  #979eaa;
+  --secondary-container:        #353c46;
+  --on-secondary:               #1a212a;
+  --on-secondary-container:     #b9c0cc;
+
+  /* ── Tertiary ──────────────────────────────────────── */
+  --tertiary:                   #e4ebff;
+  --tertiary-dim:               #c3cfeb;
+  --tertiary-container:         #d1ddfa;
+
+  /* ── Text / On-surface ─────────────────────────────── */
+  --on-surface:                 #dae6fa;
+  --on-surface-variant:         #9facbe;
+  --on-background:              #dae6fa;
+
+  /* ── Outline ───────────────────────────────────────── */
+  --outline:                    #6a7687;
+  --outline-variant:            #3d4958;
+
+  /* ── Error ─────────────────────────────────────────── */
+  --error:                      #ee7d77;
+  --error-container:            #7f2927;
+  --on-error:                   #490106;
+  --on-error-container:         #ff9993;
+  --error-dim:                  #bb5551;
+
+  /* ── Misc ─────────────────────────────────────────── */
+  --surface-tint:               #c4c7ca;
+  --inverse-surface:            #f8f9ff;
+  --inverse-on-surface:         #51555b;
+  --inverse-primary:            #5c5f63;
+
+  /* ── Fonts ────────────────────────────────────────── */
+  --font-headline: 'Manrope', sans-serif;
+  --font-body:     'Inter', sans-serif;
+  --font-label:    'Inter', sans-serif;
+
+  /* ── Radii ────────────────────────────────────────── */
+  --radius-sm:   0.125rem;
+  --radius-md:   0.25rem;
+  --radius-lg:   0.5rem;
+  --radius-xl:   0.75rem;
+  --radius-2xl:  1rem;
+  --radius-full: 9999px;
+
+  font-family: var(--font-body);
+  color-scheme: dark;
+}
+
+/* ── Reset & base ───────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--surface);
+  color: #e5e7eb;
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(196, 199, 202, 0.3);
+  color: var(--on-surface);
+}
+
+#root {
+  width: 100%;
+  height: 100svh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Material icon defaults ─────────────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ── Glass panel ────────────────────────────────────── */
+.glass-panel {
+  background: rgba(26, 39, 53, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* ── Custom scrollbar ───────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar        { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track   { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb   { background: var(--outline-variant); border-radius: 10px; }
+
+/* ── Animations ─────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+@keyframes bounce-dot {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
