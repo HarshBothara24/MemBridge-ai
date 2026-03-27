@@ -15,8 +15,9 @@ import logging
 from db import init_db
 from memory import extract_facts
 from memory_engine import (
-    upsert_facts, get_active_facts, get_facts_by_keys,
+    upsert_facts, get_active_facts, get_facts_by_keys, get_relevant_facts,
     get_timeline, get_profile, save_chat_message, get_recent_history,
+    get_or_create_session
 )
 from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
@@ -51,6 +52,7 @@ def on_startup():
 class ChatRequest(BaseModel):
     message: str
     customer_id: str
+    session_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -59,6 +61,7 @@ class ChatResponse(BaseModel):
     intent: str
     suggestions: list
     language: str
+    session_id: str
 
 
 # ──────────────────────────────────────────────
@@ -82,6 +85,9 @@ def chat(req: ChatRequest):
     lang = detect_language(req.message)
     logger.info("Language detected: %s", lang)
 
+    # Ensure Session
+    session_id = get_or_create_session(req.customer_id, req.session_id)
+
     # 2. Fast regex fact extraction
     regex_facts = extract_facts(req.message)
     logger.info("Regex extracted %d facts", len(regex_facts))
@@ -99,16 +105,14 @@ def chat(req: ChatRequest):
         upsert_facts(req.customer_id, merged_facts)
 
     # Save user message to chat history
-    save_chat_message(req.customer_id, "user", req.message, merged_facts)
+    save_chat_message(req.customer_id, session_id, "user", req.message, merged_facts)
 
-    # 6. Classify intent and fetch relevant memory
+    # 6. Classify intent and fetch relevant memory dynamically ranked
     intent, memory_keys = classify_intent(req.message)
     logger.info("Intent: %s → memory keys: %s", intent, memory_keys)
 
-    if memory_keys:
-        relevant_facts = get_facts_by_keys(req.customer_id, memory_keys)
-    else:
-        relevant_facts = get_active_facts(req.customer_id)
+    # Use Top-K Relevance Selector
+    relevant_facts = get_relevant_facts(req.customer_id, memory_keys, limit=8)
 
     # 7. Build natural language context (NEVER raw DB values)
     memory_context = build_memory_context(relevant_facts, lang)
@@ -124,7 +128,7 @@ def chat(req: ChatRequest):
     response = generate_response(prompt)
 
     # 9. Save assistant response
-    save_chat_message(req.customer_id, "assistant", response)
+    save_chat_message(req.customer_id, session_id, "assistant", response)
 
     # 10. Generate recall suggestions
     all_facts = get_active_facts(req.customer_id)
@@ -136,6 +140,7 @@ def chat(req: ChatRequest):
         intent=intent,
         suggestions=suggestions,
         language=lang,
+        session_id=session_id,
     )
 
 
@@ -173,6 +178,9 @@ def chat_stream(req: ChatRequest):
     # 1. Detect language
     lang = detect_language(req.message)
 
+    # Ensure Session
+    session_id = get_or_create_session(req.customer_id, req.session_id)
+
     # 2. Fast regex fact extraction
     regex_facts = extract_facts(req.message)
 
@@ -187,15 +195,13 @@ def chat_stream(req: ChatRequest):
         upsert_facts(req.customer_id, merged_facts)
 
     # Save user message
-    save_chat_message(req.customer_id, "user", req.message, merged_facts)
+    save_chat_message(req.customer_id, session_id, "user", req.message, merged_facts)
 
-    # 6. Classify intent and fetch relevant memory
+    # 6. Classify intent and fetch relevant memory dynamically ranked
     intent, memory_keys = classify_intent(req.message)
 
-    if memory_keys:
-        relevant_facts = get_facts_by_keys(req.customer_id, memory_keys)
-    else:
-        relevant_facts = get_active_facts(req.customer_id)
+    # Use Top-K Relevance Selector
+    relevant_facts = get_relevant_facts(req.customer_id, memory_keys, limit=8)
 
     # 7. Build context
     memory_context = build_memory_context(relevant_facts, lang)
@@ -214,6 +220,7 @@ def chat_stream(req: ChatRequest):
             "intent": intent,
             "suggestions": suggestions,
             "language": lang,
+            "session_id": session_id,
         }
         yield json.dumps(meta) + "\n"
 
@@ -227,7 +234,7 @@ def chat_stream(req: ChatRequest):
 
         # Save assistant response after streaming completes
         if full_response:
-            save_chat_message(req.customer_id, "assistant", full_response)
+            save_chat_message(req.customer_id, session_id, "assistant", full_response)
 
 
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")

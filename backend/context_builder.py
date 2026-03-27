@@ -188,25 +188,26 @@ def build_full_prompt(
     if lang == "hi":
         parts.append(
             "Tum ek helpful banking assistant ho MemBridge AI ke liye. "
-            "Hamesha user ki language mein jawaab do — agar user Hindi (Romanized) mein baat kare toh Hindi mein jawaab do. "
-            "Naturally aur conversationally baat karo. Database ya robot jaisa mat bolo."
+            "Agar user explicit Hindi (Romanized) mein baat kare toh sirf tabhi Hindi mein jawaab do. Varna default English use karo. "
+            "Naturally aur conversationally baat karo. Database ya robot jaisa mat bolo. "
+            "Jab bhi tum memory use karo, user ko lightly batao ki tumne wo yaad kyu rakha hai (jaise: 'Maine aapke co-applicant ko consider kiya kyunki...')."
         )
     else:
         parts.append(
-            "You are a helpful, friendly banking assistant for MemBridge AI. "
-            "Always respond in the same language the user is speaking. "
-            "If the user speaks in Hindi (Romanized), respond in Hindi. "
-            "Respond naturally and conversationally. Do not sound like a database or a robot."
+            "You are a helpful, senior banking assistant for MemBridge AI. "
+            "Your default language is English. Only switch to Hindi (Romanized) if the user explicitly speaks to you in Hindi or requests it. "
+            "Respond naturally and conversationally. Do not sound like a database, do not mechanically list facts. "
+            "CRITICAL: When using facts from memory, optionally explain *why* you are considering them (e.g., 'I considered your co-applicant because it positively affects your eligibility...')."
         )
 
     # Memory context
     if memory_context and memory_context.strip():
         if lang == "hi":
             parts.append(f"\nIs customer ke baare mein jo aapko pata hai:\n{memory_context}")
-            parts.append("Is jaankari ko naturally use karo apne jawaab mein. Facts ko mechanically list mat karo.")
+            parts.append("Is jaankari ko naturally conversation mein blend karo. Mechanical lists mat dena.")
         else:
-            parts.append(f"\nWhat you know about this customer:\n{memory_context}")
-            parts.append("Use this information naturally in your responses. Do not list facts mechanically.")
+            parts.append(f"\nWhat you securely know about this customer across sessions:\n{memory_context}")
+            parts.append("Use this contextual memory naturally. Do not say 'According to my memory', just smoothly incorporate it.")
 
     # Recent history
     if history:

@@ -32,8 +32,9 @@ def extract_facts_llm(message: str) -> List[Dict[str, str]]:
     Falls back to empty list on any error.
     """
     prompt = f"""Extract structured financial facts from the following user message.
-Return ONLY a valid JSON array. Each item must have "key", "value", and "confidence" (0.0-1.0).
+Return ONLY a valid JSON array. Each item must have "type", "key", "value", and "confidence" (0.0-1.0).
 
+Valid types: financial, profile, preference, event
 Valid keys: income, loan_type, co_applicant, co_applicant_income, co_applicant_name, age, credit_score, employment, documents, property, property_location, property_value, loan_amount, emi, tenure
 
 If no facts found, return: []
@@ -99,6 +100,7 @@ def _validate_facts(facts: list) -> List[Dict[str, str]]:
     for f in facts:
         if isinstance(f, dict) and "key" in f and "value" in f:
             valid.append({
+                "type": str(f.get("type", "profile")).strip().lower(),
                 "key": str(f["key"]).strip().lower().replace(" ", "_"),
                 "value": str(f["value"]).strip(),
                 "confidence": float(f.get("confidence", 0.7)),

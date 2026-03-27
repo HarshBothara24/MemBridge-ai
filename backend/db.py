@@ -72,16 +72,33 @@ def get_cursor(dict_cursor=True):
 # Schema migration
 # ──────────────────────────────────────────────
 SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'closed')),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Structured memory facts with versioning
 CREATE TABLE IF NOT EXISTS memory_facts (
     id              SERIAL PRIMARY KEY,
-    user_id         TEXT NOT NULL,
+    user_id         TEXT NOT NULL REFERENCES users(id),
+    type            TEXT NOT NULL DEFAULT 'profile' CHECK (type IN ('financial', 'profile', 'preference', 'event')),
     key             TEXT NOT NULL,
     value           JSONB NOT NULL,
     confidence      REAL DEFAULT 0.8,
+    importance_score REAL DEFAULT 0.0,
     version         INTEGER DEFAULT 1,
     status          TEXT DEFAULT 'active' CHECK (status IN ('active', 'superseded')),
     source          TEXT DEFAULT 'user' CHECK (source IN ('user', 'inferred', 'llm')),
+    access_count    INTEGER DEFAULT 0,
+    last_accessed_at TIMESTAMP DEFAULT NOW(),
     created_at      TIMESTAMP DEFAULT NOW(),
     updated_at      TIMESTAMP DEFAULT NOW()
 );
@@ -94,7 +111,8 @@ CREATE INDEX IF NOT EXISTS idx_facts_timeline    ON memory_facts(user_id, create
 -- Chat history
 CREATE TABLE IF NOT EXISTS chat_history (
     id              SERIAL PRIMARY KEY,
-    user_id         TEXT NOT NULL,
+    user_id         TEXT NOT NULL REFERENCES users(id),
+    session_id      TEXT REFERENCES sessions(id),
     role            TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
     content         TEXT NOT NULL,
     extracted_facts JSONB DEFAULT '[]'::jsonb,
@@ -109,6 +127,9 @@ def init_db():
     """Run schema migration. Safe to call multiple times."""
     with get_cursor(dict_cursor=False) as cur:
         cur.execute(SCHEMA_SQL)
+        # Safe migrations for existing deployments
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0;")
+        cur.execute("ALTER TABLE memory_facts ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMP DEFAULT NOW();")
     logger.info("Database schema initialized.")
 
 

@@ -29,7 +29,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
         if match:
             raw = match.group(1).replace(",", "")
             if raw.isdigit() and int(raw) >= 1000:
-                facts.append({"key": "income", "value": raw, "confidence": 0.9})
+                facts.append({"type": "financial", "key": "income", "value": raw, "confidence": 0.9})
             break
 
     # ── Loan type ───────────────────────────────
@@ -48,7 +48,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
     }
     for keyword, canonical in loan_types.items():
         if keyword in lower:
-            facts.append({"key": "loan_type", "value": canonical, "confidence": 0.9})
+            facts.append({"type": "financial", "key": "loan_type", "value": canonical, "confidence": 0.9})
             break
 
     # ── Co-applicant ────────────────────────────
@@ -61,7 +61,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
     ]
     for cp in co_patterns:
         if re.search(cp, lower):
-            facts.append({"key": "co_applicant", "value": "yes", "confidence": 0.85})
+            facts.append({"type": "profile", "key": "co_applicant", "value": "yes", "confidence": 0.85})
             break
 
     # ── Age ─────────────────────────────────────
@@ -69,14 +69,14 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
         r"(?:i am|i'm|age\s*(?:is)?|meri\s*(?:umar|age))\s*(\d{2})\s*(?:years?\s*old|saal)?", lower
     )
     if age_match:
-        facts.append({"key": "age", "value": age_match.group(1), "confidence": 0.9})
+        facts.append({"type": "profile", "key": "age", "value": age_match.group(1), "confidence": 0.9})
 
     # ── Credit score ────────────────────────────
     score_match = re.search(
         r"(?:credit\s*score|cibil)\s*(?:is|of|around|about|hai)?\s*(\d{3})", lower
     )
     if score_match:
-        facts.append({"key": "credit_score", "value": score_match.group(1), "confidence": 0.9})
+        facts.append({"type": "financial", "key": "credit_score", "value": score_match.group(1), "confidence": 0.9})
 
     # ── Employment type ─────────────────────────
     emp_keywords = {
@@ -93,7 +93,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
     }
     for keyword, canonical in emp_keywords.items():
         if keyword in lower:
-            facts.append({"key": "employment", "value": canonical, "confidence": 0.85})
+            facts.append({"type": "profile", "key": "employment", "value": canonical, "confidence": 0.85})
             break
 
     # ── Loan amount ─────────────────────────────
@@ -109,7 +109,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
             if raw.isdigit() and int(raw) >= 10000:
                 # Don't add if same as income
                 if not any(f["key"] == "income" and f["value"] == raw for f in facts):
-                    facts.append({"key": "loan_amount", "value": raw, "confidence": 0.85})
+                    facts.append({"type": "financial", "key": "loan_amount", "value": raw, "confidence": 0.85})
             break
 
     # ── Documents ───────────────────────────────
@@ -125,7 +125,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
     ]
     for dk in doc_keywords:
         if re.search(dk, lower):
-            facts.append({"key": "documents", "value": "mentioned", "confidence": 0.7})
+            facts.append({"type": "event", "key": "documents", "value": "mentioned", "confidence": 0.7})
             break
 
     # ── Property ────────────────────────────────
@@ -135,7 +135,7 @@ def extract_facts(message: str) -> List[Dict[str, Any]]:
     for pp in property_patterns:
         match = re.search(pp, lower)
         if match:
-            facts.append({"key": "property_location", "value": match.group(1).title(), "confidence": 0.75})
+            facts.append({"type": "financial", "key": "property_location", "value": match.group(1).title(), "confidence": 0.75})
             break
 
     return facts
