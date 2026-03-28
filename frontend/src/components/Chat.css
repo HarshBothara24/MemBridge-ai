@@ -221,6 +221,82 @@
   gap: 10px;
 }
 
+.voice-live {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(12, 29, 52, 0.08));
+  box-shadow: var(--shadow-sm);
+  animation: voice-panel-in 0.2s ease both;
+}
+
+.voice-live p {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  font-weight: 700;
+  color: var(--text-navy);
+}
+
+.voice-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+
+.voice-bars span {
+  width: 3px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: voice-bar 0.8s ease-in-out infinite;
+}
+
+.voice-bars span:nth-child(2) { animation-delay: 0.1s; }
+.voice-bars span:nth-child(3) { animation-delay: 0.2s; }
+.voice-bars span:nth-child(4) { animation-delay: 0.3s; }
+.voice-bars span:nth-child(5) { animation-delay: 0.4s; }
+
+.voice-recording {
+  border-color: rgba(239, 68, 68, 0.25);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(255, 220, 220, 0.45));
+}
+
+.voice-recording .voice-bars span {
+  background: #ef4444;
+  animation-duration: 0.55s;
+}
+
+.voice-transcribing .voice-bars span {
+  background: #0ea5e9;
+  animation-duration: 0.75s;
+}
+
+.voice-thinking .voice-bars span {
+  background: #3b82f6;
+  animation-duration: 0.9s;
+}
+
+.voice-speaking .voice-bars span {
+  background: #10b981;
+  animation-duration: 0.5s;
+}
+
+@keyframes voice-bar {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.5; }
+  50% { transform: scaleY(1.7); opacity: 1; }
+}
+
+@keyframes voice-panel-in {
+  from { transform: translateY(6px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 .chat-input-group {
   display: flex;
   align-items: center;
@@ -371,6 +447,7 @@
   .chat-messages { padding: 20px 16px 160px; gap: 16px; }
   .chat-input-area { padding: 0 16px 16px; }
   .msg-bubble { padding: 12px 14px; font-size: 13px; }
+  .voice-live p { font-size: 11px; }
 }
 
 /* ── Mic button ─────────────────────────────────────── */

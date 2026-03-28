@@ -64,7 +64,7 @@ def build_memory_context(
         NEVER returns raw key=value pairs.
     """
     if not facts:
-        if lang == "hi":
+        if lang in ("hi", "mixed"):
             return "Abhi tak koi jaankari nahi hai."
         return "No information available about this customer yet."
 
@@ -104,7 +104,7 @@ def build_recall_suggestions(
 
     fact_keys = {f["key"] for f in facts}
 
-    if lang == "hi":
+    if lang in ("hi", "mixed"):
         return _suggestions_hi(facts, fact_keys, intent)
     return _suggestions_en(facts, fact_keys, intent)
 
@@ -194,34 +194,39 @@ def build_full_prompt(
     parts = []
 
     # System instruction
-    if lang == "hi":
+    if lang in ("hi", "mixed"):
         parts.append(
-            "IMPORTANT: You MUST respond ONLY in Hindi (Devanagari script or Romanized Hindi). "
-            "Do NOT respond in English under any circumstances. "
-            "Tum ek helpful banking assistant ho MemBridge AI ke liye. "
-            "Hamesha SIRF Hindi mein seedha aur concise jawaab do — English bilkul mat use karo. "
-            "Agar loan calculation poochi jaye toh seedha numbers do — EMI, interest rate, total amount. "
-            "Ek hi baar jawaab do, repeat mat karo. 3-4 sentences mein khatam karo. "
-            "Jab bhi tum memory use karo, user ko lightly batao ki tumne wo yaad kyu rakha hai. "
-            "Database ya robot jaisa mat bolo. Baar baar same baat mat dohrao."
+            "You are a senior banking assistant for MemBridge AI. User prefers Hindi — respond primarily in Hindi (Devanagari or Roman), but use English when it improves clarity or is user-initiated.\n\n"
+            "RESPONSE FRAMEWORK:\n"
+            "1. INTENT FIRST: Understand what the user really wants (eligibility check? EMI calc? advice?).\n"
+            "2. QUICK & CLEAR: Respond in 2-3 sentences max. Only key facts—no numbers unless directly asked.\n"
+            "3. NATURAL RECALL: Weave their memory naturally ('Aapne kaha tha ki...'), never mechanical.\n"
+            "4. ONE INSIGHT: Add one simple insight (e.g., affordability concern, eligibility factor, next step).\n"
+            "5. FOLLOW-UP Q: End with a helpful clarifying question to move the conversation forward.\n\n"
+            "LANGUAGE: Use Hindi naturally; code-switch to English for technical terms or if user does. No robot-like tone.\n"
+            "CONFIDENCE: Present calculated numbers directly. If unsure, ask one question—don't guess."
         )
     else:
         parts.append(
-            "You are a helpful, senior banking assistant for MemBridge AI. "
-            "Always respond concisely in 3-5 sentences maximum. Never repeat yourself. "
-            "If asked about loans or EMI, present the pre-calculated numbers directly — do not recalculate. "
-            "When using facts from memory, briefly explain why you considered them. "
-            "Do not hedge or loop — give one clear, direct answer and stop."
+            "You are a senior banking assistant for MemBridge AI, helping customers with loans and financial guidance.\n\n"
+            "RESPONSE FRAMEWORK:\n"
+            "1. INTENT FIRST: Understand what the user really wants (eligibility check? EMI calc? advice?).\n"
+            "2. QUICK & CLEAR: Respond in 2-3 sentences max. Only key facts—no lengthy details or number lists.\n"
+            "3. NATURAL RECALL: Reference their memory naturally ('As you mentioned...'), never mechanical.\n"
+            "4. ONE INSIGHT: Add one simple insight (e.g., affordability concern, eligibility factor, next step).\n"
+            "5. FOLLOW-UP Q: End with a helpful clarifying question to move the conversation forward.\n\n"
+            "LANGUAGE: Default English. If user writes in Hindi or requests it, code-switch naturally.\n"
+            "CONFIDENCE: Present calculated numbers directly. If unsure, ask one question—don't apologize or hedge."
         )
 
     # Memory context
     if memory_context and memory_context.strip():
-        if lang == "hi":
-            parts.append(f"\nIs customer ke baare mein jo aapko pata hai:\n{memory_context}")
-            parts.append("Is jaankari ko naturally conversation mein blend karo. Mechanical lists mat dena.")
+        if lang in ("hi", "mixed"):
+            parts.append(f"\nCUSTOMER CONTEXT (Use naturally, bilingual):\n{memory_context}\n")
+            parts.append("↳ Blend this into your response naturally; avoid mechanical retrieval. Code-switch if needed.")
         else:
-            parts.append(f"\nWhat you securely know about this customer across sessions:\n{memory_context}")
-            parts.append("Use this contextual memory naturally. Do not say 'According to my memory', just smoothly incorporate it.")
+            parts.append(f"\nCUSTOMER CONTEXT (Reference only):\n{memory_context}\n")
+            parts.append("↳ Weave this naturally into your response; avoid mechanical retrieval.")
 
     # Recent history
     if history:
@@ -230,10 +235,10 @@ def build_full_prompt(
             role_label = "User" if msg["role"] == "user" else "Assistant"
             lines.append(f"{role_label}: {msg['content']}")
         history_text = "\n".join(lines)
-        if lang == "hi":
-            parts.append(f"\nHaal ki baatcheet:\n{history_text}")
+        if lang in ("hi", "mixed"):
+            parts.append(f"\nHAAL KI BAATCHEET (tone and continuity):\n{history_text}")
         else:
-            parts.append(f"\nRecent conversation:\n{history_text}")
+            parts.append(f"\nCONVERSATION HISTORY (For continuity and tone):\n{history_text}")
 
     parts.append(f"\nUser: {message}")
     parts.append("Assistant:")

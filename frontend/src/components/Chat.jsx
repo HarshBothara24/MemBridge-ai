@@ -35,14 +35,30 @@ export default function Chat({ customerId, onMemoryUpdate }) {
   const [streaming, setStreaming] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [recording, setRecording] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState('idle')
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
+  const voiceAudioRef = useRef(null)
+  const voiceStageTimersRef = useRef([])
+  const voiceTextTimerRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    return () => {
+      voiceStageTimersRef.current.forEach((t) => clearTimeout(t))
+      voiceStageTimersRef.current = []
+      if (voiceTextTimerRef.current) clearTimeout(voiceTextTimerRef.current)
+      if (voiceAudioRef.current) {
+        voiceAudioRef.current.pause()
+        voiceAudioRef.current = null
+      }
+    }
+  }, [])
 
   // Reset messages when customer changes
   useEffect(() => {
@@ -144,6 +160,89 @@ export default function Chat({ customerId, onMemoryUpdate }) {
     }
   }
 
+  function clearVoiceTimers() {
+    voiceStageTimersRef.current.forEach((t) => clearTimeout(t))
+    voiceStageTimersRef.current = []
+    if (voiceTextTimerRef.current) {
+      clearTimeout(voiceTextTimerRef.current)
+      voiceTextTimerRef.current = null
+    }
+  }
+
+  function queueVoiceStages() {
+    clearVoiceTimers()
+    const toTranscribing = setTimeout(() => setVoiceStatus('transcribing'), 180)
+    const toThinking = setTimeout(() => setVoiceStatus('thinking'), 1200)
+    voiceStageTimersRef.current = [toTranscribing, toThinking]
+  }
+
+  async function streamVoiceText(fullText, meta) {
+    const tokens = (fullText || '').split(/(\s+)/).filter(Boolean)
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'ai',
+        text: '',
+        facts: [],
+        isVoice: true,
+        audioUrl: meta.audioUrl,
+        language: meta.language,
+        isStreaming: true,
+      },
+    ])
+
+    if (tokens.length === 0) {
+      setMessages((prev) => {
+        const updated = [...prev]
+        const idx = updated.length - 1
+        if (idx >= 0 && updated[idx].role === 'ai') {
+          updated[idx] = { ...updated[idx], text: fullText || '', isStreaming: false }
+        }
+        return updated
+      })
+      return
+    }
+
+    await new Promise((resolve) => {
+      let i = 0
+
+      const tick = () => {
+        setMessages((prev) => {
+          const updated = [...prev]
+          const idx = updated.length - 1
+          if (idx >= 0 && updated[idx].role === 'ai') {
+            updated[idx] = {
+              ...updated[idx],
+              text: (updated[idx].text || '') + (tokens[i] || ''),
+              isStreaming: i < tokens.length - 1,
+            }
+          }
+          return updated
+        })
+
+        i += 1
+        if (i >= tokens.length) {
+          resolve()
+          return
+        }
+
+        const delay = tokens[i - 1].trim() ? 28 : 8
+        voiceTextTimerRef.current = setTimeout(tick, delay)
+      }
+
+      tick()
+    })
+  }
+
+  function getVoiceStatusLabel() {
+    if (voiceStatus === 'recording') return 'Listening...'
+    if (voiceStatus === 'transcribing') return 'Transcribing...'
+    if (voiceStatus === 'thinking') return 'Generating reply...'
+    if (voiceStatus === 'speaking') return 'Speaking...'
+    return ''
+  }
+
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -163,6 +262,7 @@ export default function Chat({ customerId, onMemoryUpdate }) {
 
       recorder.start()
       setRecording(true)
+      setVoiceStatus('recording')
     } catch (err) {
       console.error('Mic access denied:', err)
       alert('Microphone access is required for voice input.')
@@ -172,14 +272,17 @@ export default function Chat({ customerId, onMemoryUpdate }) {
   function stopRecording() {
     mediaRecorderRef.current?.stop()
     setRecording(false)
+    setVoiceStatus('uploading')
   }
 
   async function handleVoiceSend(audioBlob) {
     setLoading(true)
+    queueVoiceStages()
     setMessages((prev) => [...prev, { role: 'user', text: '🎤 Voice message...', facts: [], isVoice: true }])
 
     try {
       const result = await sendVoiceMessage(audioBlob, customerId)
+      clearVoiceTimers()
 
       if (result.error) throw new Error(result.error)
 
@@ -194,18 +297,42 @@ export default function Chat({ customerId, onMemoryUpdate }) {
         return updated
       })
 
-      // Add AI response
-      setMessages((prev) => [...prev, { role: 'ai', text: result.text, facts: [], isVoice: true, audioUrl: result.audio_url, language: result.language }])
+      setVoiceStatus('thinking')
+      await streamVoiceText(result.text, {
+        audioUrl: result.audio_url,
+        language: result.language,
+      })
 
       // Auto-play audio response
       if (result.audio_url) {
+        setVoiceStatus('speaking')
+        if (voiceAudioRef.current) {
+          voiceAudioRef.current.pause()
+          voiceAudioRef.current = null
+        }
         const audio = new Audio(result.audio_url)
-        audio.play().catch(() => {})
+        voiceAudioRef.current = audio
+        audio.onended = () => {
+          setVoiceStatus('idle')
+          voiceAudioRef.current = null
+        }
+        audio.onerror = () => {
+          setVoiceStatus('idle')
+          voiceAudioRef.current = null
+        }
+        audio.play().catch(() => {
+          setVoiceStatus('idle')
+          voiceAudioRef.current = null
+        })
+      } else {
+        setVoiceStatus('idle')
       }
 
       if (onMemoryUpdate) onMemoryUpdate()
     } catch (err) {
       console.error('Voice error:', err)
+      clearVoiceTimers()
+      setVoiceStatus('idle')
       setMessages((prev) => [...prev, { role: 'ai', text: 'Voice processing failed. Please try again.', facts: [] }])
     } finally {
       setLoading(false)
@@ -323,6 +450,18 @@ export default function Chat({ customerId, onMemoryUpdate }) {
       {/* ── Input ───────────────────────────────────── */}
       <div className="chat-input-area">
         <div className="chat-input-wrapper">
+          {voiceStatus !== 'idle' && (
+            <div className={`voice-live voice-${voiceStatus}`}>
+              <div className="voice-bars" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <p>{getVoiceStatusLabel()}</p>
+            </div>
+          )}
           <div className="chat-input-group">
             <input
               ref={inputRef}
@@ -332,12 +471,12 @@ export default function Chat({ customerId, onMemoryUpdate }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={loading || streaming || recording}
+              disabled={loading || streaming || recording || voiceStatus !== 'idle'}
             />
             <button
               className={`mic-btn ${recording ? 'recording' : ''}`}
               onClick={recording ? stopRecording : startRecording}
-              disabled={loading || streaming}
+              disabled={loading || streaming || (voiceStatus !== 'idle' && !recording)}
               aria-label={recording ? 'Stop recording' : 'Click to speak'}
               title={recording ? 'Click to stop' : 'Click to speak'}
             >
@@ -348,7 +487,7 @@ export default function Chat({ customerId, onMemoryUpdate }) {
             <button
               id="send-button"
               onClick={() => handleSend()}
-              disabled={loading || streaming || !input.trim() || recording}
+              disabled={loading || streaming || !input.trim() || recording || voiceStatus !== 'idle'}
               aria-label="Send message"
             >
               <span className="material-symbols-outlined">arrow_upward</span>

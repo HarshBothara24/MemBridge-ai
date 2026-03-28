@@ -6,3 +6,4 @@ gtts
 python-multipart
 openai-whisper
 python-dotenv
+imageio-ffmpeg

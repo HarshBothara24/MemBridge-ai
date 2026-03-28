@@ -4,7 +4,7 @@ Cognitive Memory Layer with structured memory, intent-based retrieval,
 temporal reasoning, and bilingual (EN/HI) support.
 """
 
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +13,7 @@ from typing import Optional
 import json
 import logging
 import os
+import time
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -25,7 +26,7 @@ from memory_engine import (
 )
 from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
-from llm_service import extract_facts_llm, generate_response, generate_response_stream
+from llm_service import extract_facts_llm, generate_response, generate_response_stream, generate_response_voice
 from loan_calculator import get_calculation_context
 from services.stt_service import transcribe
 from services.tts_service import generate_audio
@@ -232,6 +233,26 @@ def _merge_facts(regex_facts: list, llm_facts: list) -> list:
     return list(merged.values())
 
 
+def _should_use_llm_fact_extraction(message: str, regex_facts: list) -> bool:
+    """
+    Adaptive gate for expensive LLM fact extraction in voice flow.
+    Run LLM extraction only when regex signals are insufficient or the utterance is complex.
+    """
+    text = (message or "").strip()
+    if not text:
+        return False
+
+    words = text.split()
+    has_numeric_signal = any(ch.isdigit() for ch in text)
+    is_complex = len(words) >= 16 or len(text) >= 90 or text.count(",") >= 2
+
+    # If regex already extracted enough facts, skip the LLM extraction call for speed.
+    if len(regex_facts) >= 2 and not is_complex:
+        return False
+
+    return is_complex or (has_numeric_signal and len(regex_facts) == 0) or len(regex_facts) == 0
+
+
 # ──────────────────────────────────────────────
 # Streaming Chat Endpoint
 # ──────────────────────────────────────────────
@@ -406,23 +427,28 @@ async def voice_chat(
         tmp_path = tmp.name
 
     try:
+        t0 = time.perf_counter()
+
         # 1. Transcribe
         result = transcribe(tmp_path)
         transcribed_text = result["text"]
         whisper_lang = result["language"]
+        t_stt = time.perf_counter()
 
         if not transcribed_text.strip():
             return {"error": "Could not transcribe audio", "text": "", "audio_url": None, "language": "en"}
 
-        # 2. Language detection — combine Whisper hint + text heuristic
+        # 2. Language detection — prioritize transcript semantics for Hinglish/Hindi
         text_lang = detect_lang_voice(transcribed_text)
-        # Whisper lang takes priority for hi/en, text heuristic catches mixed
-        lang = text_lang if text_lang == "mixed" else whisper_lang
+        if text_lang in ("hi", "mixed"):
+            lang = text_lang
+        else:
+            lang = whisper_lang
 
         # 3. Process via existing memory pipeline
         session = get_or_create_session(customer_id, session_id)
         regex_facts = extract_facts(transcribed_text)
-        llm_facts = extract_facts_llm(transcribed_text)
+        llm_facts = extract_facts_llm(transcribed_text) if _should_use_llm_fact_extraction(transcribed_text, regex_facts) else []
         merged = {f["key"]: f for f in llm_facts}
         merged.update({f["key"]: f for f in regex_facts})
         merged_facts = list(merged.values())
@@ -441,12 +467,22 @@ async def voice_chat(
         if calc_context:
             prompt = calc_context + "\n\n" + prompt
 
-        response_text = generate_response(prompt)
+        response_text = generate_response_voice(prompt, lang=lang)
+        t_llm = time.perf_counter()
         save_chat_message(customer_id, session, "assistant", response_text)
 
         # 4. TTS
         audio_filename = generate_audio(response_text, lang)
         audio_url = f"{BASE_URL}/audio/{audio_filename}"
+        t_tts = time.perf_counter()
+
+        logger.info(
+            "Voice latency (ms): stt=%d llm=%d tts=%d total=%d",
+            int((t_stt - t0) * 1000),
+            int((t_llm - t_stt) * 1000),
+            int((t_tts - t_llm) * 1000),
+            int((t_tts - t0) * 1000),
+        )
 
         return {
             "transcription": transcribed_text,
@@ -458,6 +494,6 @@ async def voice_chat(
 
     except Exception as e:
         logger.error("Voice endpoint failed: %s", e)
-        return {"error": str(e), "text": "", "audio_url": None, "language": "en"}
+        raise HTTPException(status_code=500, detail=f"Voice processing failed: {e}")
     finally:
         os.unlink(tmp_path)
