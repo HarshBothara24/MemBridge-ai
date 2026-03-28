@@ -33,7 +33,6 @@ export default function Chat({ customerId, onMemoryUpdate }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
-  const [suggestions, setSuggestions] = useState([])
   const [recording, setRecording] = useState(false)
   const [voiceStatus, setVoiceStatus] = useState('idle')
   const bottomRef = useRef(null)
@@ -63,7 +62,6 @@ export default function Chat({ customerId, onMemoryUpdate }) {
   // Reset messages when customer changes
   useEffect(() => {
     setMessages([])
-    setSuggestions([])
   }, [customerId])
 
   const handleSend = useCallback(async (text) => {
@@ -102,7 +100,6 @@ export default function Chat({ customerId, onMemoryUpdate }) {
             }
             return updated
           })
-          setSuggestions(meta.suggestions || [])
         },
         // onToken: append each token to the AI message
         (token) => {
@@ -427,25 +424,6 @@ export default function Chat({ customerId, onMemoryUpdate }) {
 
         <div ref={bottomRef} />
       </div>
-
-      {/* ── Suggestions ──────────────────────────────── */}
-      {suggestions.length > 0 && !loading && !streaming && (
-        <div className="suggestions-area">
-          {suggestions.map((s, i) => (
-            <div
-              key={i}
-              className="suggestion-card"
-              style={{ animationDelay: `${i * 100}ms` }}
-              onClick={() => handleSend(s)}
-            >
-              <div className="suggestion-icon">
-                <span className="material-symbols-outlined">lightbulb</span>
-              </div>
-              <span className="suggestion-text">{s}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* ── Input ───────────────────────────────────── */}
       <div className="chat-input-area">

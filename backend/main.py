@@ -168,16 +168,17 @@ def chat(req: ChatRequest):
     # 6. Classify intent and fetch relevant memory dynamically ranked
     intent, memory_keys = classify_intent(req.message)
     logger.info("Intent: %s → memory keys: %s", intent, memory_keys)
+    facts_limit, history_limit = _context_limits(req.message)
 
     # Use Top-K Relevance Selector
-    relevant_facts = get_relevant_facts(req.customer_id, memory_keys, limit=8)
+    relevant_facts = get_relevant_facts(req.customer_id, memory_keys, limit=facts_limit)
 
     # 7. Build natural language context (NEVER raw DB values)
     memory_context = build_memory_context(relevant_facts, lang)
     logger.info("Memory context: %s", memory_context[:200])
 
     # Get recent chat history
-    history = get_recent_history(req.customer_id, limit=6)
+    history = get_recent_history(req.customer_id, limit=history_limit)
 
     # 8. Build full prompt and generate response
     prompt = build_full_prompt(req.message, memory_context, history, lang)
@@ -263,6 +264,15 @@ def _should_use_llm_fact_extraction(message: str, regex_facts: list) -> bool:
     return is_complex or (has_numeric_signal and len(regex_facts) == 0) or len(regex_facts) == 0
 
 
+def _context_limits(message: str) -> tuple[int, int]:
+    """Adaptive limits for relevant facts and history to keep prompts compact."""
+    text = (message or "").strip()
+    is_complex = len(text) >= 90 or text.count(",") >= 2 or len(text.split()) >= 16
+    if is_complex:
+        return 8, 6
+    return 5, 4
+
+
 # ──────────────────────────────────────────────
 # Streaming Chat Endpoint
 # ──────────────────────────────────────────────
@@ -317,13 +327,14 @@ def chat_stream(req: ChatRequest):
 
     # 6. Classify intent and fetch relevant memory dynamically ranked
     intent, memory_keys = classify_intent(req.message)
+    facts_limit, history_limit = _context_limits(req.message)
 
     # Use Top-K Relevance Selector
-    relevant_facts = get_relevant_facts(req.customer_id, memory_keys, limit=8)
+    relevant_facts = get_relevant_facts(req.customer_id, memory_keys, limit=facts_limit)
 
     # 7. Build context
     memory_context = build_memory_context(relevant_facts, lang)
-    history = get_recent_history(req.customer_id, limit=6)
+    history = get_recent_history(req.customer_id, limit=history_limit)
     prompt = build_full_prompt(req.message, memory_context, history, lang)
 
     # Inject pre-computed loan calculations if applicable
@@ -468,9 +479,10 @@ async def voice_chat(
         save_chat_message(customer_id, session, "user", transcribed_text, merged_facts)
 
         intent, memory_keys = classify_intent(transcribed_text)
-        relevant_facts = get_facts_by_keys(customer_id, memory_keys) if memory_keys else get_active_facts(customer_id)
+        facts_limit, history_limit = _context_limits(transcribed_text)
+        relevant_facts = get_facts_by_keys(customer_id, memory_keys)[:facts_limit] if memory_keys else get_active_facts(customer_id)[:facts_limit]
         memory_context = build_memory_context(relevant_facts, lang)
-        history = get_recent_history(customer_id, limit=6)
+        history = get_recent_history(customer_id, limit=history_limit)
         prompt = build_full_prompt(transcribed_text, memory_context, history, lang)
 
         calc_context = get_calculation_context(transcribed_text, relevant_facts, lang)

@@ -202,7 +202,7 @@ def build_full_prompt(
             "2. QUICK & CLEAR: Respond in 2-3 sentences max. Only key facts—no numbers unless directly asked.\n"
             "3. NATURAL RECALL: Weave their memory naturally ('Aapne kaha tha ki...'), never mechanical.\n"
             "4. ONE INSIGHT: Add one simple insight (e.g., affordability concern, eligibility factor, next step).\n"
-            "5. FOLLOW-UP Q: End with a helpful clarifying question to move the conversation forward.\n\n"
+            "5. PROFESSIONAL TONE: Do not add chatbot-style nudges or salesy prompts (e.g., 'Shall we check?'). Ask a question only when essential for missing data.\n\n"
             "LANGUAGE: Use Hindi naturally; code-switch to English for technical terms or if user does. No robot-like tone.\n"
             "CONFIDENCE: Present calculated numbers directly. If unsure, ask one question—don't guess."
         )
@@ -214,7 +214,7 @@ def build_full_prompt(
             "2. QUICK & CLEAR: Respond in 2-3 sentences max. Only key facts—no lengthy details or number lists.\n"
             "3. NATURAL RECALL: Reference their memory naturally ('As you mentioned...'), never mechanical.\n"
             "4. ONE INSIGHT: Add one simple insight (e.g., affordability concern, eligibility factor, next step).\n"
-            "5. FOLLOW-UP Q: End with a helpful clarifying question to move the conversation forward.\n\n"
+            "5. PROFESSIONAL TONE: Do not add chatbot-style nudges or salesy prompts (e.g., 'Shall we check?'). Ask a question only when essential for missing data.\n\n"
             "LANGUAGE: Default English. If user writes in Hindi or requests it, code-switch naturally.\n"
             "CONFIDENCE: Present calculated numbers directly. If unsure, ask one question—don't apologize or hedge."
         )
