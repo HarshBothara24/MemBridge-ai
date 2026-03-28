@@ -20,6 +20,10 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "llama3:8b"
 VOICE_MODEL_NAME = os.getenv("OLLAMA_VOICE_MODEL", MODEL_NAME)
 TIMEOUT_SECONDS = 30  # generous timeout for local models
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
+OLLAMA_NUM_GPU = int(os.getenv("OLLAMA_NUM_GPU", "1"))
+OLLAMA_NUM_THREAD = int(os.getenv("OLLAMA_NUM_THREAD", str(max(2, (os.cpu_count() or 4) - 1))))
+ENABLE_HINDI_REWRITE_FALLBACK = os.getenv("ENABLE_HINDI_REWRITE_FALLBACK", "false").lower() in ("1", "true", "yes")
 
 HINDI_DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
 HINDI_ROMAN_HINTS_RE = re.compile(
@@ -30,6 +34,33 @@ ENGLISH_FUNCTION_WORDS_RE = re.compile(
     r"\b(?:the|is|are|was|were|have|has|had|would|should|can|could|please|you|your|this|that|and|or|but)\b",
     re.IGNORECASE,
 )
+
+
+def _base_options() -> Dict[str, Any]:
+    return {
+        "num_gpu": OLLAMA_NUM_GPU,
+        "num_thread": OLLAMA_NUM_THREAD,
+    }
+
+
+def warmup_ollama() -> None:
+    """Warm up local Ollama model to reduce first-token latency."""
+    payload = {
+        "model": VOICE_MODEL_NAME,
+        "prompt": "ping",
+        "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
+        "options": {
+            **_base_options(),
+            "temperature": 0.0,
+            "num_predict": 1,
+        },
+    }
+    try:
+        requests.post(OLLAMA_URL, json=payload, timeout=8)
+        logger.info("Ollama warmup requested for model: %s", VOICE_MODEL_NAME)
+    except Exception as e:
+        logger.warning("Ollama warmup skipped: %s", e)
 
 
 # ──────────────────────────────────────────────
@@ -61,7 +92,9 @@ JSON Array:"""
             "model": MODEL_NAME,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": OLLAMA_KEEP_ALIVE,
             "options": {
+                **_base_options(),
                 "temperature": 0.1,  # low temp for deterministic extraction
                 "num_predict": 256,  # keep response short
             },
@@ -134,7 +167,9 @@ def generate_response(prompt: str) -> str:
         "model": MODEL_NAME,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
         "options": {
+            **_base_options(),
             "temperature": 0.5,
             "num_predict": 300,
             "repeat_penalty": 1.3,
@@ -178,7 +213,9 @@ def generate_response_voice(prompt: str, lang: str = "en") -> str:
         "model": VOICE_MODEL_NAME,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
         "options": {
+            **_base_options(),
             "temperature": 0.3,
             "num_predict": 140,
             "repeat_penalty": 1.2,
@@ -191,7 +228,12 @@ def generate_response_voice(prompt: str, lang: str = "en") -> str:
         res.raise_for_status()
         response = res.json().get("response", "").strip()
 
-        if response and lang in ("hi", "mixed") and not _is_hindi_quality_response(response):
+        if (
+            ENABLE_HINDI_REWRITE_FALLBACK
+            and response
+            and lang in ("hi", "mixed")
+            and not _is_hindi_quality_response(response)
+        ):
             response = _rewrite_to_hindi(response)
 
         if not response:
@@ -231,7 +273,9 @@ def _rewrite_to_hindi(text: str) -> str:
         "model": VOICE_MODEL_NAME,
         "prompt": rewrite_prompt,
         "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
         "options": {
+            **_base_options(),
             "temperature": 0.2,
             "num_predict": 120,
             "repeat_penalty": 1.1,
@@ -255,6 +299,7 @@ def generate_response_stream(prompt: str):
     and {"token": "", "done": true, "full_response": "..."} at the end.
     """
     stream_options = {
+        **_base_options(),
         "temperature": 0.5,
         "num_predict": 300,
         "repeat_penalty": 1.3,
@@ -264,7 +309,13 @@ def generate_response_stream(prompt: str):
     full_response = ""
 
     try:
-        stream_payload = {"model": MODEL_NAME, "prompt": prompt, "stream": True, "options": stream_options}
+        stream_payload = {
+            "model": MODEL_NAME,
+            "prompt": prompt,
+            "stream": True,
+            "keep_alive": OLLAMA_KEEP_ALIVE,
+            "options": stream_options,
+        }
         with requests.post(OLLAMA_URL, json=stream_payload, timeout=120, stream=True) as res:
             res.raise_for_status()
             for line in res.iter_lines(decode_unicode=True):

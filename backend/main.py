@@ -26,9 +26,9 @@ from memory_engine import (
 )
 from intent_router import classify_intent
 from context_builder import detect_language, build_memory_context, build_recall_suggestions, build_full_prompt
-from llm_service import extract_facts_llm, generate_response, generate_response_stream, generate_response_voice
+from llm_service import extract_facts_llm, generate_response, generate_response_stream, generate_response_voice, warmup_ollama
 from loan_calculator import get_calculation_context
-from services.stt_service import transcribe
+from services.stt_service import transcribe, _get_model as warmup_whisper_model
 from services.tts_service import generate_audio
 from services.language_service import detect_language as detect_lang_voice
 from services.memory_connections import attach_relationships
@@ -55,6 +55,12 @@ app.add_middleware(
 def on_startup():
     """Initialize database on startup."""
     init_db()
+    if WARMUP_MODELS_ON_STARTUP:
+        try:
+            warmup_whisper_model()
+        except Exception as e:
+            logger.warning("Whisper warmup skipped: %s", e)
+        warmup_ollama()
     logger.info("MemBridge AI v2.0 — Cognitive Memory Layer ready.")
 
 
@@ -65,6 +71,8 @@ os.makedirs("static/temp", exist_ok=True)
 app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+ENABLE_LLM_FACT_EXTRACTION = os.getenv("ENABLE_LLM_FACT_EXTRACTION", "true").lower() in ("1", "true", "yes")
+WARMUP_MODELS_ON_STARTUP = os.getenv("WARMUP_MODELS_ON_STARTUP", "true").lower() in ("1", "true", "yes")
 
 
 # ──────────────────────────────────────────────
@@ -118,7 +126,7 @@ def chat(req: ChatRequest):
     logger.info("Regex extracted %d facts", len(regex_facts))
 
     # 3. LLM fact extraction (richer, handles complex sentences)
-    llm_facts = extract_facts_llm(req.message)
+    llm_facts = extract_facts_llm(req.message) if _should_use_llm_fact_extraction(req.message, regex_facts) else []
     logger.info("LLM extracted %d facts", len(llm_facts))
 
     # 4. Merge facts (regex takes priority for same keys due to higher confidence)
@@ -239,6 +247,8 @@ def _should_use_llm_fact_extraction(message: str, regex_facts: list) -> bool:
     Run LLM extraction only when regex signals are insufficient or the utterance is complex.
     """
     text = (message or "").strip()
+    if not ENABLE_LLM_FACT_EXTRACTION:
+        return False
     if not text:
         return False
 
@@ -272,7 +282,7 @@ def chat_stream(req: ChatRequest):
     regex_facts = extract_facts(req.message)
 
     # 3. LLM fact extraction
-    llm_facts = extract_facts_llm(req.message)
+    llm_facts = extract_facts_llm(req.message) if _should_use_llm_fact_extraction(req.message, regex_facts) else []
 
     # 4. Merge facts
     merged_facts = _merge_facts(regex_facts, llm_facts)

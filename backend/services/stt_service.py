@@ -10,6 +10,11 @@ import shutil
 import importlib
 from subprocess import CalledProcessError, run
 
+try:
+    import torch
+except Exception:  # pragma: no cover
+    torch = None
+
 logger = logging.getLogger(__name__)
 
 WHISPER_MODEL_NAME = "medium"
@@ -17,12 +22,25 @@ WHISPER_MODEL_NAME = "medium"
 _model = None
 _ffmpeg_checked = False
 _whisper_loader_patched = False
+WHISPER_CUDA_DEVICE = os.getenv("WHISPER_CUDA_DEVICE", "0")
+
+
+def _has_cuda() -> bool:
+    return bool(torch is not None and torch.cuda.is_available())
+
+
+def _whisper_device() -> str:
+    if not _has_cuda():
+        return "cpu"
+    return f"cuda:{WHISPER_CUDA_DEVICE}"
 
 def _get_model():
     global _model
     if _model is None:
+        device = _whisper_device()
         logger.info("Loading Whisper model: %s", WHISPER_MODEL_NAME)
-        _model = whisper.load_model(WHISPER_MODEL_NAME)
+        _model = whisper.load_model(WHISPER_MODEL_NAME, device=device)
+        logger.info("Whisper running on device: %s", device)
     return _model
 
 
@@ -100,7 +118,7 @@ def transcribe(audio_path: str, language_hint: str = None) -> dict:
         # Single-pass STT for lower latency while preserving language detection.
         transcribe_kwargs = {
             "task": "transcribe",
-            "fp16": False,
+            "fp16": _has_cuda(),
             "temperature": 0.0,
             "condition_on_previous_text": False,
         }
